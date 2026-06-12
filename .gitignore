@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.nbc
+*.nbi
+.DS_Store
+.idea/
+src/*.egg-info/
+
+# Ignore user workspaces by default. Only the public template is tracked.
+work_*/
+!work_template/
+!work_template/**
+
+# Keep empty directories in the public workspace template.
+!work_template/data/
+!work_template/data/*/
+!work_template/data/**/.gitkeep
+!work_template/logs/
+!work_template/logs/.gitkeep
+
+*.log

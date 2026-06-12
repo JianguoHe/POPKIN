@@ -1,0 +1,85 @@
+# POPKIN/pyproject.toml
+
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "popkin"
+version = "1.0.0"
+description = "Population Synthesis and Stellar Kinematics"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Jianguo He", email = "hejg@smail.nju.edu.cn"},
+    {name = "Yong Shao", email = "shaoyong@nju.edu.cn"},
+    {name = "Yudong Nie", email = "1452531593@qq.com"},
+    {name = "Guiyu Wang", email = "21332635@qq.com"}
+]
+maintainers = [
+    {name = "Jianguo He", email = "hejg@smail.nju.edu.cn"}
+]
+
+requires-python = ">=3.14"
+
+# 项目依赖
+dependencies = [
+    "astropy>=7.2.0",
+    "numpy>=2.0,<2.4",
+    "numba>=0.64.0",
+    "pyyaml>=6.0.3",
+    "scipy>=1.17.1",
+    "tqdm>=4.67.3",
+    "pandas>=3.0.2",
+    "legwork>=0.5.2",
+    "tables>=3.11.0",
+]
+
+# 可选依赖
+[project.optional-dependencies]
+dev = [
+    "gala>=1.11.0",
+]
+
+# 项目 URL
+[project.urls]
+Homepage = "https://github.com/yourname/popkin"
+Documentation = "https://github.com/yourname/popkin/docs"
+Repository = "https://github.com/yourname/popkin.git"
+Issues = "https://github.com/yourname/popkin/issues"
+
+# 包配置
+[tool.setuptools]
+# 包在 src 目录下
+package-dir = {"" = "src"}
+# 自动发现包
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["popkin*"]
+#exclude = ["tests*", "docs*"]
+
+# 包含数据文件
+[tool.setuptools.package-data]
+popkin = [
+    "binding_energy/**/*",
+]
+
+## 黑帽格式化配置（可选）
+#[tool.black]
+#line-length = 88
+#target-version = ['py38']
+#include = '\.pyi?$'
+#
+## pytest 配置（可选）
+#[tool.pytest.ini_options]
+#minversion = "7.0"
+#testpaths = ["tests"]
+#python_files = ["test_*.py", "*_test.py"]
+#
+## mypy 配置（可选）
+#[tool.mypy]
+#python_version = "3.8"
+#ignore_missing_imports = true

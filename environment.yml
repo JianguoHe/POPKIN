@@ -1,0 +1,15 @@
+name: popkin
+channels:
+  - conda-forge
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/
+  - defaults
+dependencies:
+  - python=3.14
+  - numpy>=2.0,<2.4
+  - numba>=0.64.0
+  - pytables>=3.11.0
+  - pip
+  - pip:
+    - -e .

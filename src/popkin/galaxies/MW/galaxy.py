@@ -1,0 +1,581 @@
+import numpy as np
+from scipy.stats import gamma
+from typing import Literal, Any
+from popkin.utils import average_stellar_mass
+import json
+from popkin.galaxies.MW.component import ThinDisk, ThickDisk, Bulge
+from popkin.galaxies.MW.ISM import MolecularClouds, ColdHI, WarmHI, WarmHII, HotHII
+from popkin.config.controls_default import Z_list
+
+
+# ==================== Milky Way model ====================
+
+class MilkyWay:
+    """Milky Way model.
+
+    Combines Galactic structural components and interstellar-medium phases,
+    and provides metallicity distributions and star formation history.
+
+    Attributes:
+        metallicity_model: Metallicity model type.
+        Z: Metallicity value.
+        Z_grid: Metallicity grid (20 x 12).
+        IMF_scheme: IMF model
+        binary_fraction: Binary fraction
+        bulge: Bulge component.
+        thin_disk: Thin-disk component.
+        thick_disk: Thick-disk component.
+        molecular_clouds: Molecular clouds.
+        cold_hi: Cold neutral hydrogen.
+        warm_hi: Warm neutral hydrogen.
+        warm_hii: Warm ionized hydrogen.
+        hot_hii: Hot ionized hydrogen.
+    """
+
+    def __init__(
+            self,
+            metallicity_model: Literal['constant', 'enrichment'] = 'constant',
+            Z: float = 0.02,
+            IMF_scheme: str = 'Kroupa2002',
+            binary_fraction: float | str = 'Haaften2013',
+    ):
+        """Initialize the Milky Way model.
+
+        Args:
+            metallicity_model: Metallicity model.
+                - 'constant': use a fixed metallicity.
+                - 'enrichment': use the predefined metallicity grid varying with time and radius.
+            Z: Metallicity value used to select stellar birth regions.
+            IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
+            binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013'
+
+        Raises:
+            ValueError: If parameters are outside supported ranges.
+        """
+        # Check metallicity model.
+        if metallicity_model not in ['constant', 'enrichment']:
+            raise ValueError(
+                f"metallicity_model must be 'constant' or 'enrichment', got {metallicity_model}"
+            )
+
+        # Check Z range.
+        if not isinstance(Z, (int, float)) or Z <= 0 or Z >= 1:
+            raise ValueError(
+                f"Z must be a positive float in (0, 1), got {Z}. Recommended range: 0.0001-0.03"
+            )
+
+        # Check Z for the enrichment model.
+        if metallicity_model == 'enrichment' and Z not in Z_list:
+            raise ValueError(
+                f"When metallicity_model='enrichment', Z must be in Z_list. Got {Z}\n"
+                f"Available values: {Z_list}"
+            )
+
+        # Store parameters.
+        self.metallicity_model = metallicity_model
+        self.Z = Z
+        self.IMF_scheme = IMF_scheme
+        self.binary_fraction = binary_fraction
+
+        # Initialize structural components.
+        self.bulge = Bulge()
+        self.thin_disk = ThinDisk()
+        self.thick_disk = ThickDisk()
+
+        # Initialize ISM phases.
+        self.molecular_clouds = MolecularClouds()
+        self.cold_hi = ColdHI()
+        self.warm_hi = WarmHI()
+        self.warm_hii = WarmHII()
+        self.hot_hii = HotHII()
+
+        # Initialize metallicity grid.
+        self.Z_grid = self._init_metallicity_grid()
+
+        # Average stellar mass at birth.
+        self.average_stellar_mass = average_stellar_mass(self.IMF_scheme, self.binary_fraction)
+
+        # Component lists for batch operations.
+        self.components = [self.bulge, self.thin_disk, self.thick_disk]
+        self.ism_phases = [
+            self.molecular_clouds,
+            self.cold_hi,
+            self.warm_hi,
+            self.warm_hii,
+            self.hot_hii,
+        ]
+
+    def _init_metallicity_grid(self) -> np.ndarray:
+        """Initialize the metallicity grid.
+
+        Returns:
+            Metallicity grid with shape (20, 12):
+            - rows: Galactocentric radius bins from 0 to 20 kpc
+            - columns: lookback time bins from 0 to 12 Gyr
+        """
+        if self.metallicity_model == 'constant':
+            return np.full((20, 12), self.Z, dtype=float)
+        else:
+            # Predefined Milky Way metallicity grid: radius x time.
+            return np.array([
+                [0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.02, 0.02, 0.01, 0.01, 0.006],
+                [0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.02, 0.02, 0.02, 0.01, 0.009, 0.005],
+                [0.03, 0.03, 0.03, 0.03, 0.02, 0.02, 0.02, 0.02, 0.01, 0.01, 0.007, 0.004],
+                [0.03, 0.03, 0.03, 0.02, 0.02, 0.02, 0.02, 0.01, 0.01, 0.008, 0.006, 0.003],
+                [0.03, 0.02, 0.02, 0.02, 0.02, 0.02, 0.01, 0.01, 0.009, 0.007, 0.005, 0.003],
+                [0.02, 0.02, 0.02, 0.02, 0.01, 0.01, 0.01, 0.009, 0.008, 0.006, 0.004, 0.002],
+                [0.02, 0.02, 0.02, 0.01, 0.01, 0.01, 0.009, 0.008, 0.007, 0.005, 0.004, 0.002],
+                [0.02, 0.02, 0.01, 0.01, 0.01, 0.009, 0.008, 0.007, 0.006, 0.004, 0.003, 0.002],
+                [0.01, 0.01, 0.01, 0.01, 0.009, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.001],
+                [0.01, 0.01, 0.01, 0.009, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.002, 0.001],
+                [0.01, 0.009, 0.008, 0.007, 0.006, 0.006, 0.005, 0.004, 0.003, 0.003, 0.002, 0.001],
+                [0.008, 0.008, 0.007, 0.006, 0.005, 0.005, 0.004, 0.003, 0.003, 0.002, 0.002, 0.0009],
+                [0.007, 0.006, 0.006, 0.005, 0.005, 0.004, 0.003, 0.003, 0.002, 0.002, 0.001, 0.0007],
+                [0.006, 0.005, 0.005, 0.004, 0.004, 0.003, 0.003, 0.002, 0.002, 0.002, 0.001, 0.0006],
+                [0.005, 0.005, 0.004, 0.004, 0.003, 0.003, 0.002, 0.002, 0.002, 0.001, 0.001, 0.0005],
+                [0.004, 0.004, 0.004, 0.003, 0.003, 0.002, 0.002, 0.002, 0.001, 0.001, 0.0008, 0.0004],
+                [0.004, 0.003, 0.003, 0.003, 0.002, 0.002, 0.002, 0.001, 0.001, 0.0009, 0.0007, 0.0004],
+                [0.003, 0.003, 0.003, 0.002, 0.002, 0.002, 0.001, 0.001, 0.001, 0.0008, 0.0006, 0.0003],
+                [0.003, 0.002, 0.002, 0.002, 0.002, 0.001, 0.001, 0.001, 0.0009, 0.0007, 0.0005, 0.0003],
+                [0.002, 0.002, 0.002, 0.002, 0.001, 0.001, 0.001, 0.0009, 0.0007, 0.0006, 0.0004, 0.0002],
+            ])
+
+    def generate_star(
+            self,
+            tau: float | int | np.ndarray,
+            weight: float | None = None,
+    ) -> np.ndarray:
+        """Generate one or more stellar birth samples.
+
+        Generates stellar origin and birth-position information from a lookback time.
+
+        Args:
+            tau: Lookback time [unit: Gyr].
+                - scalar: generate one sample.
+                - one-dimensional array: generate multiple samples.
+            weight: System weight.
+                - float: calculate formation rate and add the 'rate' column.
+                - None: do not calculate formation rate.
+
+        Returns:
+            Structured array with fields:
+                - tau: lookback time [Gyr]
+                - origin: birth component ('thin_disk', 'thick_disk', 'bulge')
+                - R_min: minimum radial range [kpc]
+                - R_max: maximum radial range [kpc]
+                - ini_R: Galactocentric radius [kpc]
+                - ini_z: vertical height [kpc]
+                - ini_phi: azimuth angle [rad]
+                - ini_x: Cartesian x [kpc]
+                - ini_y: Cartesian y [kpc]
+                - ini_dist: distance from the Sun [kpc]
+                - rate: system formation rate [1/yr], only when weight is not None
+
+        Raises:
+            ValueError: If tau has more than one dimension.
+        """
+        # Normalize time input.
+        tau_array = self._check_tau(tau)
+        n = len(tau_array)
+
+        # Get the radial range for each time.
+        radius_ranges = self._get_radius_range(tau_array)
+        # Valid time mask in the [0, 12] Gyr range.
+        time_valid_mask = (tau_array >= 0) & (tau_array <= 12)
+        valid_mask = np.array([rr is not None for rr in radius_ranges]) & time_valid_mask
+
+        # Extract valid data.
+        tau_valid = tau_array[valid_mask]
+        n_valid = len(tau_valid)
+
+        R_min_valid = np.array([radius_ranges[i][0] for i in range(n) if valid_mask[i]])
+        R_max_valid = np.array([radius_ranges[i][1] for i in range(n) if valid_mask[i]])
+
+        # Sample origins in batch.
+        origin_codes = self._get_origin(tau_valid, R_min_valid, R_max_valid)
+
+        # Sample R and z by origin.
+        R_arr = np.zeros(n_valid)
+        z_arr = np.zeros(n_valid)
+
+        # Thin disk: Rd evolves with time.
+        mask = origin_codes == 0
+        if np.any(mask):
+            tau_masked = tau_valid[mask]
+            R_min_masked = R_min_valid[mask]
+            R_max_masked = R_max_valid[mask]
+
+            # Calculate Rd in batch.
+            Rd_arr = self.thin_disk.get_Rd(tau_masked)
+
+            # Sample R in batch with the inverse CDF.
+            R_arr[mask] = self._sample_gamma_batch(Rd_arr, R_min_masked, R_max_masked)
+
+            # Sample z in batch.
+            zd = self.thin_disk.zd
+            z_arr[mask] = self._sample_z_batch(zd, np.sum(mask))
+
+        # Thick disk and bulge: constant Rd.
+        for code, comp in [(1, self.thick_disk), (2, self.bulge)]:
+            mask = origin_codes == code
+            if np.any(mask):
+                R_min_masked = R_min_valid[mask]
+                R_max_masked = R_max_valid[mask]
+
+                R_arr[mask] = self._sample_gamma_batch(comp.Rd, R_min_masked, R_max_masked)
+                z_arr[mask] = self._sample_z_batch(comp.zd, np.sum(mask))
+
+        # Azimuth angle.
+        phi_arr = np.random.uniform(-np.pi, np.pi, n_valid)
+
+        # Coordinate calculation.
+        x_arr = R_arr * np.cos(phi_arr)
+        y_arr = R_arr * np.sin(phi_arr)
+        # In the galpy coordinate frame, the Sun is at [8.0, 0.0, 0.0208] kpc.
+        dist_arr = np.sqrt((x_arr - 8.0) ** 2 + y_arr ** 2 + (z_arr - 0.0208) ** 2)
+
+        # Build result.
+        origin_names = ['thin_disk', 'thick_disk', 'bulge']
+
+        # Preallocate output arrays.
+        tau_out = tau_array.copy()
+        R_min_out = np.full(n, np.nan)
+        R_max_out = np.full(n, np.nan)
+        origin_out = np.full(n, '', dtype='U16')
+        ini_x_out = np.full(n, np.nan)
+        ini_y_out = np.full(n, np.nan)
+        ini_z_out = np.full(n, np.nan)
+        ini_R_out = np.full(n, np.nan)
+        ini_phi_out = np.full(n, np.nan)
+        ini_dist_out = np.full(n, np.nan)
+        rate_out = np.zeros(n) if weight is not None else None
+
+        # Vectorized assignment.
+        valid_indices = np.where(valid_mask)[0]
+        R_min_out[valid_indices] = R_min_valid
+        R_max_out[valid_indices] = R_max_valid
+        origin_out[valid_indices] = [origin_names[c] for c in origin_codes]
+        ini_x_out[valid_indices] = x_arr
+        ini_y_out[valid_indices] = y_arr
+        ini_z_out[valid_indices] = z_arr
+        ini_R_out[valid_indices] = R_arr
+        ini_phi_out[valid_indices] = phi_arr
+        ini_dist_out[valid_indices] = dist_arr
+        if weight is not None:
+            rate_out[valid_indices] = self.birth_rate(
+                tau=tau_valid,
+                R_min=R_min_valid,
+                R_max=R_max_valid,
+                weight=weight
+            )
+
+        # Build result dtype.
+        dtype = [
+            ('tau', 'f8'),
+            ('R_min', 'f8'),
+            ('R_max', 'f8'),
+            ('origin', 'U16'),
+            ('ini_x', 'f8'),
+            ('ini_y', 'f8'),
+            ('ini_z', 'f8'),
+            ('ini_rho', 'f8'),
+            ('ini_phi', 'f8'),
+            ('ini_dist', 'f8'),
+        ]
+
+        # Add rate field when requested.
+        if weight is not None:
+            dtype.append(('rate', 'f8'))
+
+        # Create result array.
+        result = np.zeros(n, dtype=dtype)
+        result['tau'] = tau_out
+        result['R_min'] = R_min_out
+        result['R_max'] = R_max_out
+        result['origin'] = origin_out
+        result['ini_x'] = ini_x_out
+        result['ini_y'] = ini_y_out
+        result['ini_z'] = ini_z_out
+        result['ini_rho'] = ini_R_out
+        result['ini_phi'] = ini_phi_out
+        result['ini_dist'] = ini_dist_out
+
+        if weight is not None:
+            result['rate'] = rate_out
+
+        return result
+
+    @staticmethod
+    def _check_tau(tau: float | int | np.ndarray) -> np.ndarray:
+        """Validate and normalize time input.
+
+        Args:
+            tau: Lookback time [unit: Gyr].
+
+        Returns:
+            One-dimensional time array.
+
+        Raises:
+            ValueError: If tau has more than one dimension.
+        """
+        # Convert to array.
+        tau_array = np.asarray(tau, dtype=float)
+
+        # Check dimensionality.
+        if tau_array.ndim > 1:
+            raise ValueError(
+                f"tau must be a scalar or one-dimensional array, got {tau_array.ndim} dimensions\n"
+                f"input shape: {tau_array.shape}\n"
+                f"Please provide a one-dimensional array, e.g. tau=[1, 2, 3], or a scalar such as tau=3.14"
+            )
+
+        # Flatten to one dimension.
+        tau_array = tau_array.flatten()
+
+        return tau_array
+
+    def _get_radius_range(self, tau: np.ndarray) -> list[tuple[int, int] | None]:
+        """Determine birth-radius ranges from time and metallicity.
+
+        Args:
+            tau: Lookback time array [unit: Gyr].
+
+        Returns:
+            List of radial ranges, each as (R_min, R_max), or None when no metallicity bin matches.
+        """
+        if self.metallicity_model == 'constant':
+            return [(0, 20)] * len(tau)
+
+        n_rows, n_cols = self.Z_grid.shape
+        col_indices = np.clip(tau.astype(int), 0, n_cols - 1)
+
+        # Vectorized matching.
+        matches = np.isclose(self.Z_grid[:, col_indices], self.Z, atol=1e-6)
+
+        # Calculate ranges.
+        first = np.argmax(matches, axis=0)
+        last = n_rows - 1 - np.argmax(matches[::-1, :], axis=0)
+        has_match = np.any(matches, axis=0)
+
+        return [
+            None if not has_match[i] else (int(first[i]), int(last[i]) + 1)
+            for i in range(len(tau))
+        ]
+
+    def _get_origin(
+            self,
+            tau: np.ndarray,
+            R_min: np.ndarray,
+            R_max: np.ndarray,
+    ) -> np.ndarray:
+        """Determine stellar origin components in batch.
+
+        Args:
+            tau: Lookback time array [unit: Gyr].
+            R_min: Minimum radial range array [kpc].
+            R_max: Maximum radial range array [kpc].
+
+        Returns:
+            Origin component codes: 0=thin_disk, 1=thick_disk, 2=bulge.
+        """
+        n = len(tau)
+
+        # Component probabilities.
+        # Thin disk.
+        p_thin = (
+                self.thin_disk.sfr(tau) *
+                (self.thin_disk.radial_cdf(R_max, tau) - self.thin_disk.radial_cdf(R_min, tau))
+        )
+
+        # Thick disk.
+        p_thick = (
+                self.thick_disk.sfr(tau) *
+                (self.thick_disk.radial_cdf(R_max) - self.thick_disk.radial_cdf(R_min))
+        )
+
+        # Bulge.
+        p_bulge = (
+                self.bulge.sfr(tau) *
+                (self.bulge.radial_cdf(R_max) - self.bulge.radial_cdf(R_min))
+        )
+
+        # Probability matrix (n, 3).
+        probs = np.column_stack([p_thin, p_thick, p_bulge])
+
+        # Normalize.
+        probs = probs / probs.sum(axis=1, keepdims=True)
+
+        # Sample by probability using random numbers and cumulative probabilities.
+        cum_probs = np.cumsum(probs, axis=1)
+        u = np.random.rand(n, 1)
+
+        # First cumulative probability >= random number.
+        origin_codes = np.argmax(cum_probs >= u, axis=1)
+
+        return origin_codes  # 0: thin, 1: thick, 2: bulge
+
+    @staticmethod
+    def _sample_gamma_batch(Rd, R_min, R_max):
+        """Sample a gamma distribution in batch."""
+        Rd_arr = np.asarray(Rd)
+        R_min_arr = np.asarray(R_min)
+        R_max_arr = np.asarray(R_max)
+
+        cdf_min = gamma.cdf(R_min_arr, a=2, scale=Rd_arr)
+        cdf_max = gamma.cdf(R_max_arr, a=2, scale=Rd_arr)
+
+        u = np.random.uniform(cdf_min, cdf_max)
+        return gamma.ppf(u, a=2, scale=Rd_arr)
+
+    @staticmethod
+    def _sample_z_batch(zd, n):
+        """Sample vertical heights in batch."""
+        z = -zd * np.log(1 - np.random.rand(n))
+        z = np.minimum(z, 10.0)
+        sign = np.where(np.random.rand(n) < 0.5, -1, 1)
+        return z * sign
+
+    def sfr(self, tau: float | np.ndarray) -> float | np.ndarray:
+        """Calculate the total Milky Way star formation rate.
+
+        Args:
+            tau: Lookback time [unit: Gyr]; 0 is the present.
+
+        Returns:
+            total SFR [unit: M_sun/yr]
+        """
+        return sum(comp.sfr(tau) for comp in self.components)
+
+    def radial_cdf(
+            self,
+            R: float | np.ndarray,
+            tau: float | np.ndarray
+    ) -> float | np.ndarray:
+        """Calculate the total Milky Way radial cumulative distribution function.
+
+        Uses SFR-weighted component CDFs to return the stellar fraction within radius R.
+
+        Args:
+            R: Galactocentric radial distance [unit: kpc].
+            tau: Lookback time [unit: Gyr]; 0 is the present.
+
+        Returns:
+            Radial cumulative probability in [0, 1].
+
+        Notes:
+            Total CDF = sum(component SFR * component CDF) / total SFR.
+        """
+        # Weighted component CDFs.
+        thin_weight = self.thin_disk.sfr(tau) * self.thin_disk.radial_cdf(R, tau)
+        thick_weight = self.thick_disk.sfr(tau) * self.thick_disk.radial_cdf(R)
+        bulge_weight = self.bulge.sfr(tau) * self.bulge.radial_cdf(R)
+
+        total_weight = thin_weight + thick_weight + bulge_weight
+
+        # Normalize by total SFR.
+        return total_weight / self.sfr(tau)
+
+    def vertical_cdf(
+            self,
+            z: float | np.ndarray,
+            tau: float | np.ndarray
+    ) -> float | np.ndarray:
+        """Calculate the total Milky Way vertical cumulative distribution function.
+
+        Uses SFR-weighted component CDFs to return the stellar fraction within |z|.
+
+        Args:
+            z: Vertical height [unit: kpc].
+            tau: Lookback time [unit: Gyr]; 0 is the present.
+
+        Returns:
+            Vertical cumulative probability in [0, 1].
+
+        Notes:
+            Total CDF = sum(component SFR * component CDF) / total SFR.
+        """
+        # Weighted component CDFs.
+        thin_weight = self.thin_disk.sfr(tau) * self.thin_disk.vertical_cdf(z)
+        thick_weight = self.thick_disk.sfr(tau) * self.thick_disk.vertical_cdf(z)
+        bulge_weight = self.bulge.sfr(tau) * self.bulge.vertical_cdf(z)
+
+        total_weight = thin_weight + thick_weight + bulge_weight
+
+        # Normalize by total SFR.
+        return total_weight / self.sfr(tau)
+
+    def birth_rate(
+            self,
+            tau: float | np.ndarray,
+            R_min: float | np.ndarray,
+            R_max: float | np.ndarray,
+            weight: float,
+    ) -> float | np.ndarray:
+        """Calculate the birth or formation rate for a specific system.
+
+        Formula:
+            rate = (SFR_local / ⟨M⟩) × weight
+
+        where:
+            - SFR_local: local star formation rate [M_sun/yr]
+            - <M>: average stellar mass [M_sun]
+            - weight: system weight for single or binary populations
+
+        Args:
+            tau: Lookback time [unit: Gyr].
+            R_min: Minimum radial range [unit: kpc].
+            R_max: Maximum radial range [unit: kpc].
+            weight: Dimensionless system weight.
+
+        Returns:
+            Birth rate [unit: 1/yr].
+        """
+        # Local star formation rate [unit: M_sun/yr].
+        sfr_local = self.sfr(tau) * (
+                self.radial_cdf(R=R_max, tau=tau) - self.radial_cdf(R=R_min, tau=tau)
+        )
+
+        # Convert to stellar number birth rate [unit: 1/yr].
+        num_rate = sfr_local / self.average_stellar_mass
+
+        # Apply system weight.
+        rate = num_rate * weight
+
+        return rate
+
+    @property
+    def mass(self) -> float:
+        """Total stellar mass of the Milky Way model.
+
+        Returns:
+            Total stellar mass [unit: M_sun].
+        """
+        return sum(comp.mass for comp in self.components)
+
+    def info(self, pretty_print: bool = True) -> dict[str, Any]:
+        """Return basic Milky Way model information.
+
+        Args:
+            pretty_print: Whether to print formatted information to the console.
+
+        Returns:
+            Dictionary containing:
+                - total_stellar_mass: total stellar mass
+                - components: structural component information
+                - ism_phases: ISM phase information
+                - model: model version
+        """
+        info_dict = {
+            'total_stellar_mass': f"{self.mass:.2e} M_sun",
+            'average_stellar_mass (at birth)': f"{self.average_stellar_mass:.2e} M_sun",
+            'components': [comp.info for comp in self.components],
+            'ism_phases': [phase.info for phase in self.ism_phases],
+            'model': 'MilkyWay Galaxy Model v1.0'
+        }
+
+        if pretty_print:
+            print(json.dumps(info_dict, indent=4, ensure_ascii=False))
+
+        return info_dict
+
+
