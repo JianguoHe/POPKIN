@@ -89,7 +89,7 @@ Run the following commands in the directory where you want to place the POPKIN
 source tree:
 
 ```bash
-git clone <repository-url> POPKIN
+git clone https://github.com/JianguoHe/POPKIN.git POPKIN
 cd POPKIN
 conda env create -f environment.yml
 conda activate popkin
@@ -346,5 +346,8 @@ license text.
 
 Maintainer: Jianguo He (`hejg@smail.nju.edu.cn`)
 
-Repository, issue tracker, and DOI links will be updated before the public
-release.
+Repository: https://github.com/JianguoHe/POPKIN
+
+Issue tracker: https://github.com/JianguoHe/POPKIN/issues
+
+The DOI link will be updated before the public release.

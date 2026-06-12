@@ -46,10 +46,10 @@ dev = [
 
 # 项目 URL
 [project.urls]
-Homepage = "https://github.com/yourname/popkin"
-Documentation = "https://github.com/yourname/popkin/docs"
-Repository = "https://github.com/yourname/popkin.git"
-Issues = "https://github.com/yourname/popkin/issues"
+Homepage = "https://github.com/JianguoHe/POPKIN"
+Documentation = "https://github.com/JianguoHe/POPKIN#readme"
+Repository = "https://github.com/JianguoHe/POPKIN.git"
+Issues = "https://github.com/JianguoHe/POPKIN/issues"
 
 # 包配置
 [tool.setuptools]
