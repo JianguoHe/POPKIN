@@ -4,6 +4,7 @@ __pycache__/
 *.nbi
 .DS_Store
 .idea/
+.vscode/
 src/*.egg-info/
 
 # Ignore user workspaces by default. Only the public template is tracked.
