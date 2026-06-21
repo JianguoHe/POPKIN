@@ -8,8 +8,13 @@ channels:
 dependencies:
   - python=3.14
   - numpy>=2.0,<2.4
+  - scipy>=1.17.1
+  - pandas>=3.0.2
+  - astropy>=7.2.0
   - numba>=0.64.0
+  - tqdm>=4.67.3
   - pytables>=3.11.0
   - pip
   - pip:
+    - legwork>=0.5.2
     - -e .

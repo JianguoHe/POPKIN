@@ -30,7 +30,6 @@ dependencies = [
     "astropy>=7.2.0",
     "numpy>=2.0,<2.4",
     "numba>=0.64.0",
-    "pyyaml>=6.0.3",
     "scipy>=1.17.1",
     "tqdm>=4.67.3",
     "pandas>=3.0.2",
