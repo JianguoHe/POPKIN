@@ -1,12 +1,16 @@
 import json
 import sys
 import tracemalloc
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from popkin.galaxies import MilkyWay
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 
@@ -71,7 +75,7 @@ def pdf():
     pd.set_option('display.width', None)  # 不换行
     stars = pd.DataFrame(stars)
     print(stars)
-    stars.to_csv('./stars.csv', index=False)
+    stars.to_csv(SCRIPT_DIR / 'stars.csv', index=False)
     R = stars['ini_rho']
     z = stars['ini_z']
     plt.figure(figsize=(10, 6))

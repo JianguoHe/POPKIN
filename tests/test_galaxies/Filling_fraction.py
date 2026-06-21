@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import numpy as np
 from popkin.galaxies import MilkyWay
 import matplotlib.pyplot as plt
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def filling_fraction():
@@ -38,11 +42,10 @@ def filling_fraction():
     plt.grid(True, which="both", ls="-", alpha=0.2)
     plt.legend()
     plt.tight_layout()
-    plt.savefig('./figures/filling_fraction.pdf', dpi=300)
+    plt.savefig(SCRIPT_DIR / 'figures' / 'filling_fraction.pdf', dpi=300)
     plt.show()
 
 filling_fraction()
-
 
 
 

@@ -1,9 +1,13 @@
 import json
 import sys
 import tracemalloc
+from pathlib import Path
+
 import numpy as np
 from popkin.galaxies import MilkyWay
 import matplotlib.pyplot as plt
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def sfr():
@@ -39,7 +43,7 @@ def sfr():
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
-    plt.savefig('./figures/SFR.pdf', dpi=300, bbox_inches='tight')
+    plt.savefig(SCRIPT_DIR / 'figures' / 'SFR.pdf', dpi=300, bbox_inches='tight')
     plt.show()
 
 sfr()

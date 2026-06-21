@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 from popkin.galaxies import MilkyWay
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 galaxy = MilkyWay()
@@ -62,6 +66,6 @@ plt.xlim(0, 25)
 plt.ylim(0, max(galaxy.radial_cdf(25, tau) for tau in tau_values) * 1.1)
 
 plt.tight_layout()
-plt.savefig('./figures/CDF_radial.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(SCRIPT_DIR / 'figures' / 'CDF_radial.pdf', dpi=300, bbox_inches='tight')
 
 plt.show()

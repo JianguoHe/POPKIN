@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from popkin.stars.single_star import SingleStar
 from popkin.stars.binary_star import BinaryStar
 from popkin.kinematics.orbit import OrbitIntegrator
@@ -7,6 +9,8 @@ from popkin.utils import process_binary_star_data, merge_structured_data
 import numpy as np
 import pandas as pd
 import time
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 
@@ -42,7 +46,7 @@ for index in index_list:
     binary_data = merge_structured_data([binary_data, binary_birth])
 
     # df = pd.DataFrame(binary_data)
-    # df.to_csv('./test_orbit.csv', index=False, float_format='%.20g')
+    # df.to_csv(SCRIPT_DIR / 'test_orbit.csv', index=False, float_format='%.20g')
 
     # o = Orbit(data=star_data, info_orbit=info_orbit, obj_type='single')
     start = time.time()
@@ -58,5 +62,4 @@ end = time.time()
 print(f"耗时: {(end - start)*1000:.2f} 毫秒")
 
 df = pd.DataFrame(merge_structured_data([o.data, o.orbit_data]))
-df.to_csv('./test_orbit.csv', index=False, float_format='%.4g')
-
+df.to_csv(SCRIPT_DIR / 'test_orbit.csv', index=False, float_format='%.4g')

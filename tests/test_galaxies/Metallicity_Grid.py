@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 Z_sun = 0.0142
 Fm = -1
@@ -79,5 +83,5 @@ plt.yticks(ticks=np.arange(R_grid+1), labels=np.arange(0, R_grid+1))    # 设置
 plt.gca().invert_yaxis()
 
 plt.tight_layout()
-plt.savefig('./figures/Metallicity_Grid.pdf', dpi=300, bbox_inches='tight')
+plt.savefig(SCRIPT_DIR / 'figures' / 'Metallicity_Grid.pdf', dpi=300, bbox_inches='tight')
 plt.show()
