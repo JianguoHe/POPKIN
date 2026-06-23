@@ -17,7 +17,10 @@ if TYPE_CHECKING:
         radiative_efficiency_xie_yuan_2012,
         summarize_isolated_bh_accretion,
     )
-    from popkin.observables.microlensing import estimate_bh_lens_fraction_by_timescale
+    from popkin.observables.microlensing import (
+        add_bh_microlensing_observables,
+        estimate_bh_lens_fraction_by_timescale,
+    )
     from popkin.observables.survey_selection import (
         flux_limited_mask,
         flux_to_luminosity,
@@ -38,6 +41,7 @@ __all__ = [
     "select_gw_sources",
     "summarize_isolated_bh_accretion",
     "radiative_efficiency_xie_yuan_2012",
+    "add_bh_microlensing_observables",
     "estimate_bh_lens_fraction_by_timescale",
     "luminosity_to_flux",
     "flux_to_luminosity",
@@ -84,10 +88,20 @@ def __getattr__(name):
         }
         return exports[name]
 
-    if name == "estimate_bh_lens_fraction_by_timescale":
-        from popkin.observables.microlensing import estimate_bh_lens_fraction_by_timescale
+    if name in {
+        "add_bh_microlensing_observables",
+        "estimate_bh_lens_fraction_by_timescale",
+    }:
+        from popkin.observables.microlensing import (
+            add_bh_microlensing_observables,
+            estimate_bh_lens_fraction_by_timescale,
+        )
 
-        return estimate_bh_lens_fraction_by_timescale
+        exports = {
+            "add_bh_microlensing_observables": add_bh_microlensing_observables,
+            "estimate_bh_lens_fraction_by_timescale": estimate_bh_lens_fraction_by_timescale,
+        }
+        return exports[name]
 
     if name in {
         "luminosity_to_flux",
