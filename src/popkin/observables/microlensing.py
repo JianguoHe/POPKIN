@@ -1,15 +1,15 @@
-"""Microlensing observables for isolated compact objects."""
+"""Microlensing observables for compact lenses."""
 
 import numpy as np
 
 MAS2_PER_DEG2 = (3600.0 * 1000.0) ** 2
 
 
-def add_bh_microlensing_observables(
+def add_microlensing_observables(
         data,
         source_distance=8.0,
-        earth_velocity_y=230.0,
-        earth_velocity_z=15.5,
+        observer_velocity_y=230.0,
+        observer_velocity_z=15.5,
         source_velocity_dispersion=80.0,
         source_velocity_y=None,
         source_velocity_z=None,
@@ -23,17 +23,17 @@ def add_bh_microlensing_observables(
         weight_col="num",
         copy=True,
 ):
-    """Add basic BH microlensing observables to a foreground-lens table.
+    """Add basic microlensing observables to a foreground-lens table.
 
     The calculation follows the simplified Galactic-bulge setup used in the
-    POPKIN isolated-BH analysis: foreground BH lenses are paired statistically
-    with bulge source stars at a fixed source distance.
+    POPKIN microlensing analysis: foreground compact lenses are paired
+    statistically with bulge source stars at a fixed source distance.
 
     Args:
         data: Table-like object, usually a pandas DataFrame.
         source_distance: Source distance in kpc.
-        earth_velocity_y: Solar/Earth transverse velocity along the rotation direction in km/s.
-        earth_velocity_z: Solar/Earth vertical velocity in km/s.
+        observer_velocity_y: Observer transverse velocity along the rotation direction in km/s.
+        observer_velocity_z: Observer vertical velocity in km/s.
         source_velocity_dispersion: One-dimensional bulge source velocity dispersion in km/s.
         source_velocity_y: Optional source velocities along y in km/s. If omitted, sampled from
             a normal distribution with ``source_velocity_dispersion``.
@@ -84,12 +84,12 @@ def add_bh_microlensing_observables(
 
     with np.errstate(divide="ignore", invalid="ignore"):
         pm_y = (
-            (lens_velocity_y[valid_distance] - earth_velocity_y) / distance[valid_distance]
-            + (earth_velocity_y - source_velocity_y[valid_distance]) / source_distance
+            (lens_velocity_y[valid_distance] - observer_velocity_y) / distance[valid_distance]
+            + (observer_velocity_y - source_velocity_y[valid_distance]) / source_distance
         )
         pm_z = (
-            (lens_velocity_z[valid_distance] - earth_velocity_z) / distance[valid_distance]
-            + (earth_velocity_z - source_velocity_z[valid_distance]) / source_distance
+            (lens_velocity_z[valid_distance] - observer_velocity_z) / distance[valid_distance]
+            + (observer_velocity_z - source_velocity_z[valid_distance]) / source_distance
         )
         pm[valid_distance] = np.sqrt(pm_y ** 2 + pm_z ** 2) / 4.74
 
@@ -164,6 +164,6 @@ def estimate_bh_lens_fraction_by_timescale(t_e):
 
 
 __all__ = [
-    "add_bh_microlensing_observables",
+    "add_microlensing_observables",
     "estimate_bh_lens_fraction_by_timescale",
 ]
