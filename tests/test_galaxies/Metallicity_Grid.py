@@ -33,6 +33,9 @@ target_array = np.array([1e-4, 2e-4, 3e-4, 4e-4, 5e-4, 6e-4, 7e-4, 8e-4, 9e-4,
                          1e-3, 2e-3, 3e-3, 4e-3, 5e-3, 6e-3, 7e-3, 8e-3, 9e-3,
                          1e-2, 2e-2, 3e-2])
 
+RNG_SEED = 1
+rng = np.random.default_rng(RNG_SEED)
+
 # 在每个网格中计算金属丰度的平均值
 for i in range(tau_grid):
     for j in range(R_grid):
@@ -41,8 +44,8 @@ for i in range(tau_grid):
         tau_min, tau_max = tau_edges[i], tau_edges[i + 1]
 
         # 随机在网格内取样
-        R_samples = np.random.uniform(R_min, R_max, 1000)
-        tau_samples = np.random.uniform(tau_min, tau_max, 1000)
+        R_samples = rng.uniform(R_min, R_max, 1000)
+        tau_samples = rng.uniform(tau_min, tau_max, 1000)
 
         # 计算金属丰度并求平均
         Z_samples = cal_Z(R_samples, tau_samples)
@@ -68,7 +71,7 @@ plt.rcParams['ytick.labelsize'] = 14
 
 # 使用seaborn绘制热图
 plt.figure(figsize=(12, 8))
-sns.heatmap(Z_mean, cmap='viridis', cbar_kws={'label': 'Metallicity (Z)', 'pad': 0.03,}, annot=True,
+sns.heatmap(Z_mean, cmap='viridis', cbar_kws={'label': 'Z', 'pad': 0.03,}, annot=True,
             xticklabels=np.arange(tau_grid),  # tau刻度
             yticklabels=np.arange(R_grid),    # R刻度
             norm=LogNorm())

@@ -48,13 +48,13 @@ def use_example():
     # 4. ISM信息
     print("\n4. 星际介质信息:")
     print(f"R=8 kpc 处:")
-    print(f"  分子云面密度: {galaxy.MCs.surface_density(8):.3f} Msun/pc^2")
-    print(f"  HI总面密度: {galaxy.cold_HI.total_surface_density(8):.3f} Msun/pc^2")
-    print(f"  冷HI面密度: {galaxy.cold_HI.surface_density(8):.3f} Msun/pc^2")
-    print(f"  暖HI面密度: {galaxy.warm_HI.surface_density(8):.3f} Msun/pc^2")
-    print(f"  分子云填充因子: {galaxy.MCs.filling_fraction(8):.4f}")
-    print(f"  冷HI填充因子: {galaxy.cold_HI.filling_fraction(8):.4f}")
-    print(f"  暖HI填充因子: {galaxy.warm_HI.filling_fraction(8):.4f}")
+    print(f"  分子云面密度: {galaxy.molecular_clouds.surface_density(8):.3f} Msun/pc^2")
+    print(f"  HI总面密度: {galaxy.cold_hi.total_surface_density(8):.3f} Msun/pc^2")
+    print(f"  冷HI面密度: {galaxy.cold_hi.surface_density(8):.3f} Msun/pc^2")
+    print(f"  暖HI面密度: {galaxy.warm_hi.surface_density(8):.3f} Msun/pc^2")
+    print(f"  分子云填充因子: {galaxy.molecular_clouds.filling_fraction(8):.4f}")
+    print(f"  冷HI填充因子: {galaxy.cold_hi.filling_fraction(8):.4f}")
+    print(f"  暖HI填充因子: {galaxy.warm_hi.filling_fraction(8):.4f}")
 
     # 5. 生成恒星
     print("\n6. 生成恒星:")
@@ -94,21 +94,21 @@ def pdf():
 
 def test_ISM():
     galaxy = MilkyWay()
-    MCs = galaxy.MCs
-    cold_HI = galaxy.cold_HI
-    warm_HI = galaxy.warm_HI
-    warm_HII = galaxy.warm_HII
-    hot_HII = galaxy.hot_HII
+    MCs = galaxy.molecular_clouds
+    cold_HI = galaxy.cold_hi
+    warm_HI = galaxy.warm_hi
+    warm_HII = galaxy.warm_hii
+    hot_HII = galaxy.hot_hii
     print(MCs.n, MCs.mu, MCs.cs(200))
     print(cold_HI.n, cold_HI.mu, cold_HI.cs)
     print(warm_HI.n, warm_HI.mu, warm_HI.cs)
     print(warm_HII.n, warm_HII.mu, warm_HII.cs)
     print(hot_HII.n, hot_HII.mu, hot_HII.cs)
-    n_MCs, w_MCs = galaxy.MCs.get_discrete_number_density(n_points=10)
+    n_MCs, w_MCs = galaxy.molecular_clouds.get_discrete_number_density(n_points=10)
     print(n_MCs)
     print(w_MCs)
     print(w_MCs.sum())
-    n_coldHI, w_coldHI = galaxy.cold_HI.get_discrete_number_density(n_points=10)
+    n_coldHI, w_coldHI = galaxy.cold_hi.get_discrete_number_density(n_points=10)
     print(n_coldHI)
     print(w_coldHI)
     print(w_coldHI.sum())

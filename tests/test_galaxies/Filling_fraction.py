@@ -20,19 +20,19 @@ def filling_fraction():
 
     r_values = np.linspace(0, 30, 1000)
 
-    filling_fractions_H2 = galaxy.MCs.filling_fraction(R=r_values)
-    filling_fractions_cold_HI = galaxy.cold_HI.filling_fraction(R=r_values)
-    filling_fractions_warm_HI = galaxy.warm_HI.filling_fraction(R=r_values)
-    filling_fractions_warm_HII = galaxy.warm_HII.filling_fraction(R=r_values)
-    filling_fractions_hot_HII = galaxy.hot_HII.filling_fraction(R=r_values)
+    filling_fractions_H2 = galaxy.molecular_clouds.filling_fraction(R=r_values)
+    filling_fractions_cold_HI = galaxy.cold_hi.filling_fraction(R=r_values)
+    filling_fractions_warm_HI = galaxy.warm_hi.filling_fraction(R=r_values)
+    filling_fractions_warm_HII = galaxy.warm_hii.filling_fraction(R=r_values)
+    filling_fractions_hot_HII = galaxy.hot_hii.filling_fraction(R=r_values)
 
     # 绘制填充因子图
     plt.figure(figsize=(10, 7))
-    plt.plot(r_values, filling_fractions_H2, label='H2', color='#1f77b4', linewidth=2)
-    plt.plot(r_values, filling_fractions_cold_HI, label='cold HI', color='#ff7f0e', linewidth=2)
-    plt.plot(r_values, filling_fractions_warm_HI, label='warm HI', color='#2ca02c', linewidth=2)
-    plt.plot(r_values, filling_fractions_warm_HII, label='warm HII', color='#d62728', linewidth=2)
-    plt.plot(r_values, filling_fractions_hot_HII, label='hot HII', color='#9467bd', linewidth=2)
+    plt.plot(r_values, filling_fractions_H2, label='MCs', color='#1f77b4', linewidth=2)
+    plt.plot(r_values, filling_fractions_cold_HI, label=r'$\rm cold~H_{I}$', color='#ff7f0e', linewidth=2)
+    plt.plot(r_values, filling_fractions_warm_HI, label=r'$\rm warm~H_{I}$', color='#2ca02c', linewidth=2)
+    plt.plot(r_values, filling_fractions_warm_HII, label=r'$\rm warm~H_{II}$', color='#d62728', linewidth=2)
+    plt.plot(r_values, filling_fractions_hot_HII, label=r'$\rm hot~H_{II}$', color='#9467bd', linewidth=2)
 
     plt.xlabel(r'$R ~ \rm(kpc)$')
     plt.ylabel(r'$f_v~(z=0)$')
@@ -46,7 +46,6 @@ def filling_fraction():
     plt.show()
 
 filling_fraction()
-
 
 
 
