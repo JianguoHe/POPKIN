@@ -327,8 +327,14 @@ def post_supernova_orbit(
     # Orbital energy and eccentricity.
     E_orb_rel_cgs = 0.5 * v_rel_norm_cgs * v_rel_norm_cgs - G * m_post_cgs / R_initial_cgs
     h2_cgs = h_norm_cgs ** 2
-    ecc_kick = np.sqrt(2.0 * E_orb_rel_cgs * h2_cgs / (G * m_post_cgs) ** 2 + 1.0)
-
+    ecc2_kick = 2.0 * E_orb_rel_cgs * h2_cgs / (G * m_post_cgs) ** 2 + 1.0
+    if ecc2_kick < 0.0:
+        if ecc2_kick > -1e-10:
+            ecc2_kick = 0.0
+        else:
+            raise ValueError(f"Invalid post-supernova eccentricity squared: {ecc2_kick}")
+    ecc_kick = np.sqrt(ecc2_kick)
+    
     # Determine whether the binary is disrupted.
     R_dot_v_cgs = np.dot(R_vec_cgs, v_rel_post_SN_cgs)
 
