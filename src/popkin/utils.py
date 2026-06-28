@@ -10,6 +10,10 @@ from popkin.constants import type_mapping
 from popkin.config.logger import get_logger
 from popkin.config.controls_default import jit_enabled as _default_jit_enabled
 from popkin.config.controls_default import log10_P_min, log10_P_max, log10_P_index, sep_min, sep_max
+from popkin.config.controls_default import IMF_scheme, binary_fraction
+from popkin.config.controls_default import ini_orbit_scheme, ini_ecc_scheme
+from popkin.config.controls_default import m_range, n_grid_popsin
+from popkin.config.controls_default import m1_range, m2_range, log10_P_range, sep_range, n_grid_popbin
 
 
 logger = get_logger(__name__)
@@ -232,10 +236,10 @@ def select_structured_data(arr, cols, mask=None):
 
 
 def create_popsin_parameter_space(
-        m_range: tuple[float, float],
-        n_grid_popsin: int,
-        IMF_scheme: str,
-        binary_fraction: float | str,
+        m_range: tuple[float, float] = m_range,
+        n_grid_popsin: int = n_grid_popsin,
+        IMF_scheme: str = IMF_scheme,
+        binary_fraction: float | str = binary_fraction,
 ) -> np.ndarray:
     """Generate the mass parameter space for single star population synthesis
 
@@ -278,10 +282,10 @@ def create_popsin_parameter_space(
 
 def weight_single(
         M: float | np.ndarray,
-        m_range: tuple[float, float],
-        n_grid_popsin: int,
-        IMF_scheme: str,
-        binary_fraction: float | str,
+        m_range: tuple[float, float] = m_range,
+        n_grid_popsin: int = n_grid_popsin,
+        IMF_scheme: str = IMF_scheme,
+        binary_fraction: float | str = binary_fraction,
 ) -> float | np.ndarray:
     """Calculate the weight contribution of single stars to the stellar population
 
@@ -319,14 +323,14 @@ def weight_single(
 
 
 def create_popbin_parameter_space(
-        m1_range: tuple[float, float],
-        m2_range: tuple[float, float],
-        orbit_param_range: tuple[float, float],
-        n_grid_popbin: int,
-        ini_orbit_scheme: str,
-        ini_ecc_scheme: str,
-        IMF_scheme: str,
-        binary_fraction: float | str,
+        m1_range: tuple[float, float] = m1_range,
+        m2_range: tuple[float, float] = m2_range,
+        orbit_param_range: tuple[float, float] | None = None,
+        n_grid_popbin: int = n_grid_popbin,
+        ini_orbit_scheme: str = ini_orbit_scheme,
+        ini_ecc_scheme: str = ini_ecc_scheme,
+        IMF_scheme: str = IMF_scheme,
+        binary_fraction: float | str = binary_fraction,
         random_seed: int = 1
 ) -> np.ndarray:
     """Generate the initial parameter space for binary star population synthesis
@@ -341,7 +345,8 @@ def create_popbin_parameter_space(
     Args:
         m1_range: Primary star mass range [unit: M_sun], allowed range: [0.1, 100.0]
         m2_range: Secondary star mass range [unit: M_sun], allowed range: [0.1, 100.0]
-        orbit_param_range: Orbital period range [unit: days] (Sana2012) or semi-major axis range [unit: R_sun] (Hurley2002)
+        orbit_param_range: Orbital period range [unit: days] (Sana2012) or semi-major axis range
+            [unit: R_sun] (Hurley2002). If None, the default range is inferred from ini_orbit_scheme.
         n_grid_popbin: Number of grid points for each parameter in logarithmic space
         ini_orbit_scheme: Initial orbit model. Must be one of: 'Sana2012', 'Hurley2002'
         ini_ecc_scheme: Initial eccentricity distribution. Must be one of: 'zero', 'uniform', 'thermal'
@@ -368,6 +373,12 @@ def create_popbin_parameter_space(
     )
 
     # 2. Generate orbital parameter grid
+    if orbit_param_range is None:
+        if ini_orbit_scheme == 'Sana2012':
+            orbit_param_range = (10 ** log10_P_range[0], 10 ** log10_P_range[1])
+        elif ini_orbit_scheme == 'Hurley2002':
+            orbit_param_range = sep_range
+
     if ini_orbit_scheme == 'Sana2012':
         orbit_values = np.logspace(
             np.log10(orbit_param_range[0]), np.log10(orbit_param_range[1]), num=n_grid_popbin, endpoint=True
@@ -429,13 +440,13 @@ def weight_binary(
         M1: float | np.ndarray,
         M2: float | np.ndarray,
         orbit_param: float | np.ndarray,
-        m1_range: tuple[float, float],
-        m2_range: tuple[float, float],
-        orbit_param_range: tuple[float, float],
-        n_grid_popbin: int,
-        ini_orbit_scheme: str,
-        IMF_scheme: str,
-        binary_fraction: float | str,
+        m1_range: tuple[float, float] = m1_range,
+        m2_range: tuple[float, float] = m2_range,
+        orbit_param_range: tuple[float, float] | None = None,
+        n_grid_popbin: int = n_grid_popbin,
+        ini_orbit_scheme: str = ini_orbit_scheme,
+        IMF_scheme: str = IMF_scheme,
+        binary_fraction: float | str = binary_fraction,
 ) -> float | np.ndarray:
     """Calculate the weight contribution of binary systems to the stellar population
 
@@ -449,7 +460,8 @@ def weight_binary(
         orbit_param: Orbital period [unit: days] (Sana2012 model) or orbital semi-major axis [unit: R_sun] (Hurley2002 model)
         m1_range: Primary star mass range
         m2_range: Secondary star mass range
-        orbit_param_range: Orbital period range (Sana2012 model) or orbital semi-major axis range (Hurley2002 model)
+        orbit_param_range: Orbital period range [unit: days] (Sana2012) or semi-major axis range
+            [unit: R_sun] (Hurley2002). If None, the default range is inferred from ini_orbit_scheme.
         n_grid_popbin: Number of grid points for each parameter in logarithmic space
         ini_orbit_scheme: Initial orbit model. Support 'Sana2012' and 'Hurley2002'
         IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
@@ -473,6 +485,12 @@ def weight_binary(
     weight = frac_binary(M1, binary_fraction) * Phi_lnM1 * delta_lnM1 * varphi_lnM2 * delta_lnM2
 
     # Calculate based on orbital model
+    if orbit_param_range is None:
+        if ini_orbit_scheme == 'Sana2012':
+            orbit_param_range = (10 ** log10_P_range[0], 10 ** log10_P_range[1])
+        elif ini_orbit_scheme == 'Hurley2002':
+            orbit_param_range = sep_range
+
     if ini_orbit_scheme == 'Sana2012':
         # Period distribution function
         Psi_log10_P = _get_log10_P_normalize_factor() * np.log10(orbit_param) ** log10_P_index
@@ -519,7 +537,10 @@ def _get_log10_P_normalize_factor() -> float:
 # ---------------------------------------------------------------------------
 
 
-def initial_mass_function(M: float | np.ndarray, IMF_scheme: str) -> float | np.ndarray:
+def initial_mass_function(
+        M: float | np.ndarray, 
+        IMF_scheme: str = IMF_scheme
+) -> float | np.ndarray:
     """Calculate the stellar Initial Mass Function (IMF)
 
     Supports three commonly used IMF models:
@@ -634,7 +655,7 @@ def imf_weisz2015(M: float | np.ndarray) -> float | np.ndarray:
 
 def frac_binary(
         M: float | np.ndarray,
-        binary_fraction: float | str
+        binary_fraction: float | str = binary_fraction
 ) -> float | np.ndarray:
     """Calculate the fraction of binary systems among stars
 
@@ -671,8 +692,8 @@ def frac_binary(
 
 
 def average_stellar_mass(
-        IMF_scheme: str,
-        binary_fraction: float | str
+        IMF_scheme: str = IMF_scheme,
+        binary_fraction: float | str = binary_fraction
 ) -> float:
     """Calculate the average stellar mass (considering both single and binary systems)
 

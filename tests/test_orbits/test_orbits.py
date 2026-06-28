@@ -32,7 +32,7 @@ for index in index_list:
     print(index)
     print('*' * 65)
 
-    m1, m2, period, ecc = create_popbin_parameter_space()[index]
+    m1, m2, period, ecc, weight = create_popbin_parameter_space()[index]
 
     star1 = SingleStar(type=1, mass=m1, Z=0.02, index=index)
     star2 = SingleStar(type=1, mass=m2, Z=0.02, index=index)

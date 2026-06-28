@@ -661,41 +661,51 @@ class BinaryStar:
             # 氦星吞没在氢包层中成为CHeB/TPAGB star
             else:
                 stars[1 - i].mdot_mt = - stars[i].mdot_mt
-                self.save()
 
-                # 考虑一个步长, 在此步长内转移过来的物质形成包层, 氦星通过吸积富氢物质变成CHeB/TPAGB
-                self.dt = min(2 * self.dt, 0.005 * stars[i].mass / abs(stars[i].mdot_mt + stars[i].mdot_wind))
-                self.update_time()
-                self.update_step()
-                mass_gain = max(0.001, stars[1 - i].mdot_mt * self.dt)
-                stars[i].mass -= mass_gain
+                # 如果吸积星的质量吸积率大于星风损失率, 且一个开普勒轨道周期内的质量吸积量大于1e-4恒星的质量, 
+                # 则认为恒星被吞没在伴星的包层中, 进入公共包层演化
+                if (stars[1 - i].mdot_mt + stars[1 - i].mdot_wind > 0. and 
+                    stars[1 - i].mdot_mt * self.period > 1e-4 * stars[1 - i].mass):
+                    self.save()
 
-                # HeMS → CHeB
-                if stars[1 - i].type == 7:
-                    stars[1 - i].type = 4
-                    stars[1 - i].M_core = stars[1 - i].mass
-                    stars[1 - i].mass += mass_gain
-                    age_frac = stars[1 - i].age / stars[1 - i].tm
-                    stars[1 - i].solve_initial_mass_CHeB(stars[1 - i].M_core, age_frac)
-                    stars[1 - i].StellarCal()
-                    stars[1 - i].StellarCal()
-                    if stars[1 - i].type == 3:
-                        stars[1 - i].age = stars[1 - i].tscls[1] + 1e-6 * (stars[1 - i].tscls[2] - stars[1 - i].tscls[1])
+                    # 考虑一个步长, 在此步长内转移过来的物质形成包层, 氦星通过吸积富氢物质变成CHeB/TPAGB
+                    self.dt = min(2 * self.dt, 0.005 * stars[i].mass / abs(stars[i].mdot_mt + stars[i].mdot_wind))
+                    self.update_time()
+                    self.update_step()
+                    mass_gain = max(0.001, stars[1 - i].mdot_mt * self.dt)
+                    stars[i].mass -= mass_gain
+
+                    # HeMS → CHeB
+                    if stars[1 - i].type == 7:
+                        stars[1 - i].type = 4
+                        stars[1 - i].M_core = stars[1 - i].mass
+                        stars[1 - i].mass += mass_gain
+                        age_frac = stars[1 - i].age / stars[1 - i].tm
+                        stars[1 - i].solve_initial_mass_CHeB(stars[1 - i].M_core, age_frac)
+                        stars[1 - i].StellarCal()
+                        stars[1 - i].StellarCal()
+                        if stars[1 - i].type == 3:
+                            stars[1 - i].age = stars[1 - i].tscls[1] + 1e-6 * (stars[1 - i].tscls[2] - stars[1 - i].tscls[1])
+                        else:
+                            stars[1 - i].age = stars[1 - i].tscls[2] + age_frac * stars[1 - i].tscls[3]
+                    # He-giant → TPAGB
                     else:
-                        stars[1 - i].age = stars[1 - i].tscls[2] + age_frac * stars[1 - i].tscls[3]
-                # He-giant → TPAGB
-                else:
-                    stars[1 - i].type = 6
-                    stars[1 - i].mass += stars[1 - i].mdot_mt * self.dt
-                    stars[1 - i].solve_initial_mass_TPAGB(stars[1 - i].M_core)
-                    stars[1 - i].StellarCal()
-                    stars[1 - i].age = stars[1 - i].tscls[13]
+                        stars[1 - i].type = 6
+                        stars[1 - i].mass += stars[1 - i].mdot_mt * self.dt
+                        stars[1 - i].solve_initial_mass_TPAGB(stars[1 - i].M_core)
+                        stars[1 - i].StellarCal()
+                        stars[1 - i].age = stars[1 - i].tscls[13]
 
-                # 让双星进入公共包层演化
-                stars[1 - i].StellarProp()
-                stars[1 - i].R_mt = stars[1 - i].R
-                self.CE_evolution(i)
-                return
+                    # 更新吸积星类型
+                    self.save()
+                    self.update_step()
+                    self.update_time(use_min_timestep=True)
+
+                    # 让双星进入公共包层演化
+                    stars[1 - i].StellarProp()
+                    stars[1 - i].R_mt = stars[1 - i].R
+                    self.CE_evolution(i)
+                    return
 
         # 白矮星吸积富氢物质
         elif stars[1 - i].type in {10, 11, 12} and stars[i].type <= 6:
@@ -828,6 +838,7 @@ class BinaryStar:
         self.event = 'merge'
         self.save()
         self.update_step()
+        self.update_time(use_min_timestep=True)
 
         # 添加恒星列表, 方便调用
         stars = [self.star1, self.star2]
@@ -954,6 +965,7 @@ class BinaryStar:
         self.event = 'CE'
         self.save()
         self.update_step()
+        self.update_time(use_min_timestep=True)
 
         # 添加恒星列表, 方便调用
         stars = [self.star1, self.star2]
@@ -1079,9 +1091,9 @@ class BinaryStar:
                 core_new = stars[i].mass
             elif stars[i].type in {8, 9} and stars[1 - i].type <= 1:
                 if i == 0:
-                    core_new = self.data[self.step - 1]['m1']
+                    core_new = self.data[self.step - 1]['mc1']
                 else:
-                    core_new = self.data[self.step - 1]['m2']
+                    core_new = self.data[self.step - 1]['mc2']
             elif stars[i].type in {8, 9} and stars[1 - i].type == 7:
                 core_new = stars[i].mass
             else:

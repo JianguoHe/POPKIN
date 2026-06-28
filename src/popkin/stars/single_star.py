@@ -1585,9 +1585,11 @@ class SingleStar:
                 f_lambda = min(0.9, 0.3 + 0.001 * self.mass0 ** 5)
                 self.M_co_core = self.M_co_core - f_lambda * (self.M_co_core - mc_CO_1)
                 self.M_core = self.M_co_core
+
                 # 如果当前核质量等于恒星总质量, 说明包层已经损失, 由于只剩下了CO/ONe核, 根据简并与否判定最终产物(详见处理氦星时的情况)
                 if self.mass - self.M_core <= 1e-10:
                     self.age = 0
+                    self.M_core = mcmax
                     # 简并CO核质量未达到 mch , 只能变为CO白矮星
                     if mcbagb < 1.83:
                         self.type = 11
@@ -1613,8 +1615,8 @@ class SingleStar:
             # 检验CO/ONe核质量是否超过超新星爆炸极限质量
             # 大质量恒星会在EAGB发生SN, 此时核质量=He核质量, 因此需用CO核质量和临界值比较, 然后将临界值作为核质量, 方便SN演化
             if mcmax - self.M_co_core <= 1e-10:
-                self.M_core = mcmax
                 self.age = 0.0
+                self.M_core = mcmax
                 # 简并CO核质量达到 mch 后, 星体坍缩引发Ia超新星爆炸后不会留下恒星遗迹
                 if mcbagb < 1.83:
                     self.type = 15
@@ -1712,7 +1714,7 @@ class SingleStar:
                         self.StellarProp_NS(initialize=True)
             # 非简并的CO核, 如果包层被剥离后还没达到SN爆炸临界值, 热核会冷却由非简并 → 简并, 根据热核质量确定最终结果(这里尚待商榷)
             else:
-                # print(self.setp, self.type, self.mass0, self.mass, mcmax, self.M_core)
+                # print(self.step, self.type, self.mass0, self.mass, mcmax, self.M_core)
                 if mcmax - self.M_core < 1e-10 and not initialize:
                     self.age = 0
                     self.M_core = mcmax
