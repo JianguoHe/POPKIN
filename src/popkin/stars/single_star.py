@@ -1589,7 +1589,7 @@ class SingleStar:
                 # 如果当前核质量等于恒星总质量, 说明包层已经损失, 由于只剩下了CO/ONe核, 根据简并与否判定最终产物(详见处理氦星时的情况)
                 if self.mass - self.M_core <= 1e-10:
                     self.age = 0
-                    self.M_core = mcmax
+                    self.M_core = min(self.mass, mcmax)
                     # 简并CO核质量未达到 mch , 只能变为CO白矮星
                     if mcbagb < 1.83:
                         self.type = 11

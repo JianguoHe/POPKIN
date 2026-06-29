@@ -666,9 +666,8 @@ class BinaryStar:
                 # 则认为恒星被吞没在伴星的包层中, 进入公共包层演化
                 if (stars[1 - i].mdot_mt + stars[1 - i].mdot_wind > 0. and 
                     stars[1 - i].mdot_mt * self.period > 1e-4 * stars[1 - i].mass):
-                    self.save()
-
                     # 考虑一个步长, 在此步长内转移过来的物质形成包层, 氦星通过吸积富氢物质变成CHeB/TPAGB
+                    self.save()
                     self.dt = min(2 * self.dt, 0.005 * stars[i].mass / abs(stars[i].mdot_mt + stars[i].mdot_wind))
                     self.update_time()
                     self.update_step()
