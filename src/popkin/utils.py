@@ -931,7 +931,7 @@ def random_rotation_matrix():
     return R
 
 
-def rotate_velocity_offset_to_galactocentric(v_offset):
+def rotate_velocity_offset_to_galactocentric(v_offset, phi):
     """Rotate an offset velocity into Galactocentric velocity components."""
 
     # If input offset velocity is invalid
@@ -944,7 +944,13 @@ def rotate_velocity_offset_to_galactocentric(v_offset):
     # Transform velocity from pre-SN center-of-mass frame to Galactocentric cylindrical coordinates (vR/vT/vz)
     v_gal = rotation_matrix @ v_offset
 
-    return v_gal
+    vR = v_gal[0] * np.cos(phi) + v_gal[1] * np.sin(phi)
+    vT = v_gal[1] * np.cos(phi) - v_gal[0] * np.sin(phi)
+    vz = v_gal[2]
+
+    return np.array([vR, vT, vz])
+
+    # return v_gal
 
 
 # ---------------------------------------------------------------------------

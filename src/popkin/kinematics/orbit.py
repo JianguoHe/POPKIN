@@ -1,6 +1,6 @@
 # src/popkin/kinematics/orbit.py - single/binary orbit evolution with galpy.
 # In current tests, galpy's dop853_c integrator is the fastest option, so it is used by default.
-# The Galactic Center supermassive black hole is disabled by default and can be enabled by configuration.
+# The Galactic Center supermassive black hole is enabled by default and can be disabled by configuration.
 
 import numpy as np
 import astropy.units as u
@@ -19,7 +19,7 @@ class OrbitIntegrator:
             data: np.ndarray,
             obj_type: Literal['single', 'binary'],
             info_orbit: dict,
-            include_GC_SMBH: bool = False,
+            include_GC_SMBH: bool = True,
     ):
         self.data = data
         self.obj_type = obj_type
@@ -198,7 +198,7 @@ class OrbitIntegrator:
                     self.data['v1_offset_y'][mask][0],
                     self.data['v1_offset_z'][mask][0]
                 ])
-                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset) / 220
+                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, phi=o.phi()) / 220
                 o1 = Orbit(o.vxvv.flatten() + np.array([0, v_off[0], v_off[1], 0, v_off[2], 0]), ro=8., vo=220.)
                 self.integrate_segments(ini_o=o1, integration_target='star1')
             if self.data['type2'][mask][0] != 'massless':
@@ -207,7 +207,7 @@ class OrbitIntegrator:
                     self.data['v2_offset_y'][mask][0],
                     self.data['v2_offset_z'][mask][0]
                 ])
-                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset) / 220
+                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, phi=o.phi()) / 220
                 o2 = Orbit(o.vxvv.flatten() + np.array([0, v_off[0], v_off[1], 0, v_off[2], 0]), ro=8., vo=220.)
                 self.integrate_segments(ini_o=o2, integration_target='star2')
 
@@ -286,15 +286,17 @@ class OrbitIntegrator:
             self.orbit_pos_vel_temp[f'{orbit_cols_prefix}vz'][orig_idx] = o.vz(ts) / 220
             self.orbit_pos_vel_temp[f'{orbit_cols_prefix}vT'][orig_idx] = o.vT(ts) / 220
 
-            # Translate the pre-SN center-of-mass velocity offset to Galactocentric cylindrical coordinates.
-            offset = np.array([filtered_data[col][integrate_end] for col in check_columns])
-            v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset) / 220
-
-            # Current orbit position/velocity.
+            # Current orbit position
             last_time = ts[-1]
             last_R = o.R(t=last_time) / 8
             last_z = o.z(t=last_time) / 8
             last_phi = o.phi(t=last_time)
+
+            # Translate the pre-SN center-of-mass velocity offset to Galactocentric cylindrical coordinates.
+            offset = np.array([filtered_data[col][integrate_end] for col in check_columns])
+            v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, phi=last_phi) / 220
+
+            # Current orbit velocity.
             last_vR = o.vR(t=last_time) / 220 + v_off[0]
             last_vT = o.vT(t=last_time) / 220 + v_off[1]
             last_vz = o.vz(t=last_time) / 220 + v_off[2]
