@@ -197,6 +197,7 @@ def popbin_main(args) -> None:
         return
 
     try:
+        np.random.seed(index)
         stars = galaxy.generate_star(tau=binary_data["time"] / 1000, weight=weight)
     except Exception as e:
         logger.error(
