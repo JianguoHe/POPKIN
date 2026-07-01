@@ -896,61 +896,36 @@ def get_metallicity_str(z):
     return f"Z0{num}"
 
 
-def random_rotation_matrix():
-    """Generate a random rotation matrix (uniform distribution)"""
+def random_rotation_matrix(random_seed=None):
+    """Generate a Haar-uniform random rotation matrix."""
+    rng = np.random.default_rng(random_seed)
 
-    # Randomly generate rotation axis (u_x, u_y, u_z)
-    u = np.random.normal(size=3)
-    u /= np.linalg.norm(u)      # Normalize to unit vector
-    # u = np.array([0, 0, 1])
+    q = rng.normal(size=4)
+    q /= np.linalg.norm(q)
 
-    # Randomly select rotation angle theta
-    theta = np.random.uniform(0, 2 * np.pi)
-    # theta = np.pi / 2
+    w, x, y, z = q
 
-    # Extract rotation axis components
-    ux, uy, uz = u
-    cos_theta = np.cos(theta)
-    sin_theta = np.sin(theta)
-
-    # Construct rotation matrix
-    R = np.array([
-        [cos_theta + ux ** 2 * (1 - cos_theta),
-         ux * uy * (1 - cos_theta) - uz * sin_theta,
-         ux * uz * (1 - cos_theta) + uy * sin_theta],
-
-        [uy * ux * (1 - cos_theta) + uz * sin_theta,
-         cos_theta + uy ** 2 * (1 - cos_theta),
-         uy * uz * (1 - cos_theta) - ux * sin_theta],
-
-        [uz * ux * (1 - cos_theta) - uy * sin_theta,
-         uz * uy * (1 - cos_theta) + ux * sin_theta,
-         cos_theta + uz ** 2 * (1 - cos_theta)]
+    return np.array([
+        [1 - 2 * (y * y + z * z), 2 * (x * y - w * z),     2 * (x * z + w * y)],
+        [2 * (x * y + w * z),     1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+        [2 * (x * z - w * y),     2 * (y * z + w * x),     1 - 2 * (x * x + y * y)],
     ])
 
-    return R
 
-
-def rotate_velocity_offset_to_galactocentric(v_offset, phi):
-    """Rotate an offset velocity into Galactocentric velocity components."""
+def rotate_velocity_offset_to_galactocentric(v_offset, random_seed=None):
+    """Rotate an offset velocity into local Galactocentric cylindrical components."""
 
     # If input offset velocity is invalid
     if np.isnan(v_offset).any():
         return np.zeros(3)
 
     # Generate random rotation matrix
-    rotation_matrix = random_rotation_matrix()
+    rotation_matrix = random_rotation_matrix(random_seed=random_seed)
 
-    # Transform velocity from pre-SN center-of-mass frame to Galactocentric cylindrical coordinates (vR/vT/vz)
+    # Rotate the pre-SN center-of-mass-frame offset into the local (vR, vT, vz) basis.
     v_gal = rotation_matrix @ v_offset
 
-    vR = v_gal[0] * np.cos(phi) + v_gal[1] * np.sin(phi)
-    vT = v_gal[1] * np.cos(phi) - v_gal[0] * np.sin(phi)
-    vz = v_gal[2]
-
-    return np.array([vR, vT, vz])
-
-    # return v_gal
+    return v_gal
 
 
 # ---------------------------------------------------------------------------

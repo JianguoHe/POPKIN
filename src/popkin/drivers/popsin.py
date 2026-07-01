@@ -146,6 +146,7 @@ def popsin_main(args) -> None:
             obj_type="single",
             info_orbit=info_orbit,
             include_GC_SMBH=include_GC_SMBH,
+            base_seed=index,
         )
 
         try:

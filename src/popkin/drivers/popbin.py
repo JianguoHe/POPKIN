@@ -143,7 +143,7 @@ def log_population_progress(done, total, start_time, z, next_fraction):
         f"Population progress (Z={z}): {done}/{total} "
         f"({fraction:.1%}), rate={rate:.1f} sys/s, "
         f"elapsed={elapsed:.0f}s, eta={remaining:.0f}s",
-        extra={"console": True},
+        extra={"console": False},
     )
 
     while next_fraction <= fraction:
@@ -197,7 +197,6 @@ def popbin_main(args) -> None:
         return
 
     try:
-        np.random.seed(index)
         stars = galaxy.generate_star(tau=binary_data["time"] / 1000, weight=weight)
     except Exception as e:
         logger.error(
@@ -244,6 +243,7 @@ def popbin_main(args) -> None:
             obj_type="binary",
             info_orbit=info_orbit,
             include_GC_SMBH=include_GC_SMBH,
+            base_seed=index,
         )
 
         try:

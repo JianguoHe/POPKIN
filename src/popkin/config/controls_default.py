@@ -38,8 +38,8 @@ parallel: int = 4
 # Whether to enable orbital integration
 enable_orbital_integration: bool = False
 
-# Whether to include the Galactic Center supermassive black hole (Sgr A*)
-include_GC_SMBH: bool = True
+# Whether to include the Galactic Center supermassive black hole (Sgr A*); disabled by default
+include_GC_SMBH: bool = False
 
 # Orbit output object attributes
 #

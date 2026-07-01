@@ -1,6 +1,6 @@
 # src/popkin/kinematics/orbit.py - single/binary orbit evolution with galpy.
 # In current tests, galpy's dop853_c integrator is the fastest option, so it is used by default.
-# The Galactic Center supermassive black hole is enabled by default and can be disabled by configuration.
+# The Galactic Center supermassive black hole is disabled by default and can be enabled by configuration.
 
 import numpy as np
 import astropy.units as u
@@ -19,7 +19,8 @@ class OrbitIntegrator:
             data: np.ndarray,
             obj_type: Literal['single', 'binary'],
             info_orbit: dict,
-            include_GC_SMBH: bool = True,
+            include_GC_SMBH: bool = False,
+            base_seed: int = 42,
     ):
         self.data = data
         self.obj_type = obj_type
@@ -28,6 +29,7 @@ class OrbitIntegrator:
         self.integration_indices = self._get_integration_indices()
         self._set_galactic_potential(include_GC_SMBH)
         self._set_orbit_data()
+        self.base_seed = base_seed
 
     def _set_galactic_potential(self, include_GC_SMBH: bool):
         """Initialize the Galactic potential."""
@@ -192,13 +194,14 @@ class OrbitIntegrator:
 
             # Then integrate the disrupted components.
             mask = ~self.data['bound']
+            random_seed = self.base_seed * 1_000_000 + np.where(mask)[0][0]
             if self.data['type1'][mask][0] != 'massless':
                 offset = np.array([
                     self.data['v1_offset_x'][mask][0],
                     self.data['v1_offset_y'][mask][0],
                     self.data['v1_offset_z'][mask][0]
                 ])
-                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, phi=o.phi()) / 220
+                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, random_seed=random_seed) / 220
                 o1 = Orbit(o.vxvv.flatten() + np.array([0, v_off[0], v_off[1], 0, v_off[2], 0]), ro=8., vo=220.)
                 self.integrate_segments(ini_o=o1, integration_target='star1')
             if self.data['type2'][mask][0] != 'massless':
@@ -207,7 +210,7 @@ class OrbitIntegrator:
                     self.data['v2_offset_y'][mask][0],
                     self.data['v2_offset_z'][mask][0]
                 ])
-                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, phi=o.phi()) / 220
+                v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, random_seed=random_seed) / 220
                 o2 = Orbit(o.vxvv.flatten() + np.array([0, v_off[0], v_off[1], 0, v_off[2], 0]), ro=8., vo=220.)
                 self.integrate_segments(ini_o=o2, integration_target='star2')
 
@@ -292,9 +295,10 @@ class OrbitIntegrator:
             last_z = o.z(t=last_time) / 8
             last_phi = o.phi(t=last_time)
 
-            # Translate the pre-SN center-of-mass velocity offset to Galactocentric cylindrical coordinates.
+            # Rotate the pre-SN center-of-mass-frame offset into the local (vR, vT, vz) basis.
+            random_seed = self.base_seed * 1_000_000 + filtered_indices[integrate_end]
             offset = np.array([filtered_data[col][integrate_end] for col in check_columns])
-            v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, phi=last_phi) / 220
+            v_off = rotate_velocity_offset_to_galactocentric(v_offset=offset, random_seed=random_seed) / 220
 
             # Current orbit velocity.
             last_vR = o.vR(t=last_time) / 220 + v_off[0]
