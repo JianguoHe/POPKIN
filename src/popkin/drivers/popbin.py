@@ -367,11 +367,12 @@ def popbin() -> None:
         next_progress_fraction = POPBIN_PROGRESS_LOG_STEP
         completed_tasks = 0
 
-        with mp.Pool(
+        pool = mp.Pool(
             processes=worker_parallel,
             initializer=init_popbin_worker,
             initargs=(galaxy, queues),
-        ) as pool:
+        )
+        try:
             for _ in tqdm.tqdm(
                 pool.imap_unordered(popbin_main, valid_tasks, chunksize=50),
                 total=len(valid_tasks),
@@ -386,6 +387,13 @@ def popbin() -> None:
                     z,
                     next_progress_fraction,
                 )
+            pool.close()
+            logger.info("Waiting for worker pool to finish flushing outputs...", extra={"console": True})
+            pool.join()
+        except Exception:
+            pool.terminate()
+            pool.join()
+            raise
 
         logger.info("Stopping OutputManager...", extra={"console": True})
         manager.stop()
