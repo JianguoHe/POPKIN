@@ -49,8 +49,9 @@ class OutputManager:
             batch_size=None,
             batch_max_bytes=64 * 1024 ** 2,
             writer_count=None,
-            queue_maxsize=4,
+            queue_maxsize=16,
             merge_workers=8,
+            stop_signal_timeout=300,
     ):
         self.parallel = max(1, int(parallel))
         if writer_count is None:
@@ -59,6 +60,7 @@ class OutputManager:
             self.writer_count = max(1, int(writer_count))
         self.queue_maxsize = max(1, int(queue_maxsize))
         self.merge_workers = max(1, int(merge_workers))
+        self.stop_signal_timeout = max(1, float(stop_signal_timeout))
 
         self.data_dir = Path(data_dir)
         self.output_format = output_format
@@ -96,7 +98,7 @@ class OutputManager:
             queues = []
 
             for writer_id in range(self.writer_count):
-                queue = mp.JoinableQueue(maxsize=self.queue_maxsize)
+                queue = mp.Queue(maxsize=self.queue_maxsize)
                 process = mp.Process(
                     target=self._writer_loop,
                     args=(filename, writer_id, queue),
@@ -120,37 +122,33 @@ class OutputManager:
             while True:
                 data = queue.get()
 
-                try:
-                    if data is None:
-                        if batch:
-                            self._save_batch(filename, writer_id, batch, batch_num)
-                        break
-
-                    data_bytes = int(getattr(data, "nbytes", 0))
-
-                    if batch and batch_bytes + data_bytes >= self.batch_max_bytes:
+                if data is None:
+                    if batch:
                         self._save_batch(filename, writer_id, batch, batch_num)
-                        batch = []
-                        batch_bytes = 0
-                        batch_num += 1
+                    break
 
-                    batch.append(data)
-                    batch_bytes += data_bytes
+                data_bytes = int(getattr(data, "nbytes", 0))
 
-                    hit_byte_limit = batch_bytes >= self.batch_max_bytes
-                    hit_count_limit = (
-                        self.batch_size is not None
-                        and len(batch) >= self.batch_size
-                    )
+                if batch and batch_bytes + data_bytes >= self.batch_max_bytes:
+                    self._save_batch(filename, writer_id, batch, batch_num)
+                    batch = []
+                    batch_bytes = 0
+                    batch_num += 1
 
-                    if hit_byte_limit or hit_count_limit:
-                        self._save_batch(filename, writer_id, batch, batch_num)
-                        batch = []
-                        batch_bytes = 0
-                        batch_num += 1
+                batch.append(data)
+                batch_bytes += data_bytes
 
-                finally:
-                    queue.task_done()
+                hit_byte_limit = batch_bytes >= self.batch_max_bytes
+                hit_count_limit = (
+                    self.batch_size is not None
+                    and len(batch) >= self.batch_size
+                )
+
+                if hit_byte_limit or hit_count_limit:
+                    self._save_batch(filename, writer_id, batch, batch_num)
+                    batch = []
+                    batch_bytes = 0
+                    batch_num += 1
 
         except Exception:
             logger.exception(
@@ -187,13 +185,31 @@ class OutputManager:
                 )
 
     def _put_stop_signal(self, filename, writer_id, q):
+        start_time = time.monotonic()
+        last_warning_time = start_time
+
         while True:
             self._check_writer_failures()
             try:
                 q.put(None, timeout=0.5)
                 return
             except queue.Full:
-                continue
+                elapsed = time.monotonic() - start_time
+                if elapsed >= self.stop_signal_timeout:
+                    raise RuntimeError(
+                        f"[OutputManager] Timed out sending stop signal: "
+                        f"{filename}, writer={writer_id:02d}. "
+                        f"The output queue stayed full for {self.stop_signal_timeout:.0f}s."
+                    )
+
+                now = time.monotonic()
+                if now - last_warning_time >= 30:
+                    logger.warning(
+                        f"[OutputManager] Waiting to send stop signal: "
+                        f"{filename}, writer={writer_id:02d}, elapsed={elapsed:.0f}s",
+                        extra={"console": True},
+                    )
+                    last_warning_time = now
 
     def stop(self):
         for filename, queues in self.queues.items():
