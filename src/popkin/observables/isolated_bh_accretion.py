@@ -35,6 +35,8 @@ def summarize_isolated_bh_accretion(
     mdot_range=None,
     flux_bol_range=None,
     candidate_flux_bol_threshold=1e-14,
+    candidate_output_format="parquet",
+    candidate_compression="zstd",
     distance_cuts_kpc=DEFAULT_DISTANCE_CUTS_KPC,
 ):
     """Write compact ISM-accretion summaries for isolated black holes.
@@ -53,6 +55,11 @@ def summarize_isolated_bh_accretion(
         flux_bol_range: Thresholds for cumulative ``N(>F_bol)``.
         candidate_flux_bol_threshold: Minimum bolometric flux for writing
             candidate rows. Set to ``None`` to skip the candidate table.
+        candidate_output_format: Format for the candidate table. Use
+            ``"parquet"`` for compact, fast binary output, or ``"csv"`` for
+            legacy text output.
+        candidate_compression: Compression codec used for Parquet candidate
+            output.
         distance_cuts_kpc: Distance cuts used for extra cumulative flux columns.
     """
     _validate_columns(data)
@@ -155,15 +162,17 @@ def summarize_isolated_bh_accretion(
 
     if candidate_tables:
         candidates = pd.concat(candidate_tables, ignore_index=True)
-        candidate_path = output_dir / _candidate_filename(candidate_flux_bol_threshold)
-        candidates.to_csv(candidate_path, index=False)
+        candidate_path = output_dir / _candidate_filename(
+            candidate_flux_bol_threshold,
+            candidate_output_format,
+        )
+        _write_candidate_table(
+            candidates,
+            candidate_path,
+            output_format=candidate_output_format,
+            compression=candidate_compression,
+        )
         logger.info(f"Saved bright-candidate table: {candidate_path}", extra={"console": True})
-
-    return {
-        "mdot": mdot_df,
-        "F_bol": flux_df,
-        "candidates": pd.concat(candidate_tables, ignore_index=True) if candidate_tables else pd.DataFrame(),
-    }
 
 
 def _accumulate_phase_results(
@@ -301,9 +310,20 @@ def _distance_label(distance_kpc):
     return f"{distance_kpc:g}kpc"
 
 
-def _candidate_filename(threshold):
+def _write_candidate_table(candidates, path, *, output_format, compression):
+    output_format = output_format.lower()
+    if output_format == "csv":
+        candidates.to_csv(path, index=False)
+    elif output_format == "parquet":
+        candidates.to_parquet(path, index=False, compression=compression)
+    else:
+        raise ValueError("candidate_output_format must be 'parquet' or 'csv'")
+
+
+def _candidate_filename(threshold, output_format="csv"):
     threshold_label = f"{threshold:.0e}".replace("+", "")
-    return f"IBH_F_bol_gt_{threshold_label}.csv"
+    suffix = "parquet" if output_format == "parquet" else "csv"
+    return f"IBH_F_bol_gt_{threshold_label}.{suffix}"
 
 
 def radiative_efficiency_xie_yuan_2012(f_mdot: float | np.ndarray) -> float | np.ndarray:

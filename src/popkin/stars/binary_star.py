@@ -863,6 +863,13 @@ class BinaryStar:
             stars[i].mass += stars[1 - i].mass
             stars[i].M_core = stars[1 - i].mass
             self.set_new_star(i)
+        
+        # HeMS + MS (massive helium MS star + extremely low-mass MS companion, which usually forms when α_CE is large.)
+        elif stars[i].type == 7 and stars[1 - i].type <= 1:
+            stars[i].type = 4
+            stars[i].mass += stars[1 - i].mass
+            stars[i].M_core = stars[i].mass
+            self.set_new_star(i)
 
         # ******* 主序与致密星之间的并合 *******
         # MS + WD
