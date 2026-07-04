@@ -14,8 +14,10 @@ def add_microlensing_observables(
         source_velocity_y=None,
         source_velocity_z=None,
         random_state=None,
-        source_surface_density=1.5e8,
+        source_count=1.5e8,
         survey_area_deg2=31.0,
+        survey_duration_yr=1.0,
+        source_surface_density=None,
         distance_col="dist",
         mass_col="mass",
         lens_velocity_y_col="vT",
@@ -40,8 +42,10 @@ def add_microlensing_observables(
         source_velocity_z: Optional source velocities along z in km/s. If omitted, sampled from
             a normal distribution with ``source_velocity_dispersion``.
         random_state: Optional seed for source velocity sampling.
-        source_surface_density: Surface density of source stars in the survey field.
+        source_count: Number of monitored source stars in the survey field.
         survey_area_deg2: Survey area in square degrees.
+        survey_duration_yr: Survey duration in years.
+        source_surface_density: Deprecated alias for ``source_count``.
         distance_col: Lens distance column in kpc.
         mass_col: Lens mass column in solar masses.
         lens_velocity_y_col: Lens transverse velocity column along y in km/s.
@@ -54,6 +58,13 @@ def add_microlensing_observables(
     """
     out = data.copy() if copy else data
     n_lenses = len(out)
+
+    if survey_duration_yr < 0:
+        raise ValueError("survey_duration_yr must be non-negative")
+    if source_surface_density is not None:
+        if source_count != 1.5e8:
+            raise ValueError("Use source_count instead of source_surface_density")
+        source_count = source_surface_density
 
     rng = np.random.default_rng(random_state)
     if source_velocity_y is None:
@@ -104,9 +115,9 @@ def add_microlensing_observables(
     else:
         weights = np.asarray(out[weight_col], dtype=np.float64)
 
-    normalization = source_surface_density / (survey_area_deg2 * MAS2_PER_DEG2)
+    normalization = source_count / (survey_area_deg2 * MAS2_PER_DEG2)
     num_lens[valid_microlensing] = (
-        2.0 * theta_e[valid_microlensing] * pm[valid_microlensing]
+        2.0 * theta_e[valid_microlensing] * pm[valid_microlensing] * survey_duration_yr
         + np.pi * theta_e[valid_microlensing] ** 2
     ) * normalization * weights[valid_microlensing]
 
