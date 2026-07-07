@@ -173,6 +173,14 @@ def summarize_isolated_bh_accretion(
             compression=candidate_compression,
         )
         logger.info(f"Saved bright-candidate table: {candidate_path}", extra={"console": True})
+    elif candidate_flux_bol_threshold is not None:
+        candidate_path = output_dir / _candidate_filename(
+            candidate_flux_bol_threshold,
+            candidate_output_format,
+        )
+        if candidate_path.exists():
+            candidate_path.unlink()
+            logger.info(f"Removed stale bright-candidate table: {candidate_path}", extra={"console": True})
 
 
 def _accumulate_phase_results(
@@ -194,14 +202,21 @@ def _accumulate_phase_results(
     flux_results,
     candidate_tables,
 ):
-    valid = np.isfinite(mdot) & np.isfinite(weights) & (weights > 0)
+    dist_array = np.asarray(dist)
+    valid = (
+        np.isfinite(mdot)
+        & np.isfinite(weights)
+        & (weights > 0)
+        & np.isfinite(dist_array)
+        & (dist_array > 0)
+    )
     if not valid.any():
         return
 
-    mdot = np.asarray(mdot)[valid]
-    weights = np.asarray(weights)[valid]
-    dist = np.asarray(dist)[valid]
-    mass = np.asarray(mass)[valid]
+    mdot = np.asarray(mdot)[valid].astype(np.float64, copy=False)
+    weights = np.asarray(weights)[valid].astype(np.float64, copy=False)
+    dist = dist_array[valid].astype(np.float64, copy=False)
+    mass = np.asarray(mass)[valid].astype(np.float64, copy=False)
     v_pec = np.asarray(v_pec)[valid]
     source_index = np.asarray(source_index)[valid] if source_index is not None else None
 
@@ -210,8 +225,9 @@ def _accumulate_phase_results(
     eta = radiative_efficiency_xie_yuan_2012(mdot_edd_ratio)
     luminosity_bol = eta * mdot * c_light**2
 
+    dist_cm = dist * (1000.0 * pc)
     with np.errstate(divide="ignore", invalid="ignore"):
-        flux_bol = luminosity_bol / (4 * np.pi * (dist * 1000 * pc) ** 2)
+        flux_bol = luminosity_bol / (4.0 * np.pi * dist_cm**2)
 
     _add_result(mdot_results, phase, _weighted_cumulative(mdot, weights, mdot_range))
     _add_result(flux_results, phase, _weighted_cumulative(flux_bol, weights, flux_bol_range))
