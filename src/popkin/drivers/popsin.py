@@ -1,6 +1,7 @@
 """Single-star population synthesis driver."""
 
 import multiprocessing as mp
+import shutil
 
 import numpy as np
 import tqdm
@@ -69,9 +70,12 @@ def clean_old_outputs(filenames):
             if path.is_file():
                 path.unlink()
                 removed += 1
+            elif path.is_dir():
+                shutil.rmtree(path)
+                removed += 1
 
     if removed:
-        logger.info(f"[Cleanup] Deleted old output files: {removed}", extra={"console": True})
+        logger.info(f"[Cleanup] Deleted old outputs: {removed}", extra={"console": True})
 
 
 def popsin_main(args) -> None:

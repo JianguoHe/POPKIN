@@ -37,14 +37,14 @@ class OutputManager:
     """Batch output manager.
 
     Worker processes write intermediate npy batches. Final files are merged
-    into csv, hdf5, or npy according to the requested output format.
+    into parquet, csv, hdf5, or npy according to the requested output format.
     """
 
     def __init__(
             self,
             parallel,
             data_dir,
-            output_format="csv",
+            output_format="parquet",
             output_precision=6,
             batch_size=None,
             batch_max_bytes=64 * 1024 ** 2,
@@ -63,7 +63,7 @@ class OutputManager:
         self.stop_signal_timeout = max(1, float(stop_signal_timeout))
 
         self.data_dir = Path(data_dir)
-        self.output_format = output_format
+        self.output_format = str(output_format).lower()
         self.output_precision = int(output_precision)
         self.batch_size = None if batch_size is None else max(1, int(batch_size))
         self.batch_max_bytes = max(1, int(batch_max_bytes))
@@ -80,6 +80,14 @@ class OutputManager:
             return 3
         return 4
         # return min(32, max(1, self.parallel // 6 + 1))
+
+    def _batch_dir(self, filename):
+        return self.data_dir / f"{filename}.tmp"
+
+    def _cleanup_batch_dir(self, filename):
+        batch_dir = self._batch_dir(filename)
+        if batch_dir.exists():
+            shutil.rmtree(batch_dir)
 
     def start(self, targets, Z):
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -162,9 +170,9 @@ class OutputManager:
         combined = np.concatenate(batch)
         t_concat = time.perf_counter()
 
-        output_file = self.data_dir / (
-            f"{filename}_writer{writer_id:02d}_batch_{batch_num:06d}.npy"
-        )
+        batch_dir = self._batch_dir(filename)
+        batch_dir.mkdir(parents=True, exist_ok=True)
+        output_file = batch_dir / f"writer{writer_id:02d}_batch_{batch_num:06d}.npy"
         np.save(output_file, combined, allow_pickle=True)
         t_save = time.perf_counter()
 
@@ -242,12 +250,14 @@ class OutputManager:
 
     def merge_all(self, keep_batches=False):
         for filename in self.queues.keys():
-            batches = sorted(self.data_dir.glob(f"{filename}_writer*_batch_*.npy"))
+            batches = sorted(self._batch_dir(filename).glob("writer*_batch_*.npy"))
 
             if not batches:
                 continue
 
-            if self.output_format == "csv":
+            if self.output_format == "parquet":
+                self._merge_parquet(filename, batches, keep_batches)
+            elif self.output_format == "csv":
                 self._merge_csv(filename, batches, keep_batches)
             elif self.output_format == "hdf5":
                 self._merge_hdf5(filename, batches, keep_batches)
@@ -255,11 +265,51 @@ class OutputManager:
                 self._merge_npy(filename, batches, keep_batches)
             else:
                 raise ValueError(
-                    f"Unsupported output_format: '{self.output_format}'. Expected one of: 'csv', 'hdf5', 'npy'."
+                    f"Unsupported output_format: '{self.output_format}'. Expected one of: 'parquet', 'csv', 'hdf5', 'npy'."
                 )
+
+    def _merge_parquet(self, filename, batches, keep_batches):
+        final_dir = self.data_dir / f"{filename}.parquet"
+        if final_dir.exists():
+            if final_dir.is_dir():
+                shutil.rmtree(final_dir)
+            else:
+                final_dir.unlink()
+        final_dir.mkdir(parents=True)
+
+        logger.info(
+            f"[{filename}] Merging {len(batches)} batches into parquet dataset",
+            extra={"console": True},
+        )
+
+        t0 = time.perf_counter()
+        rows_total = 0
+        bytes_total = 0
+        for i, batch in enumerate(batches):
+            arr = np.load(batch, allow_pickle=True)
+            df = pd.DataFrame.from_records(arr)
+            part_file = final_dir / f"part_{i:06d}.parquet"
+            df.to_parquet(part_file, index=False, compression="zstd")
+            rows_total += len(arr)
+            bytes_total += int(getattr(arr, "nbytes", 0))
+
+        t_write = time.perf_counter()
+
+        if not keep_batches:
+            self._cleanup_batch_dir(filename)
+
+        logger.info(
+            f"[{filename}] Completed -> {final_dir} | "
+            f"rows={rows_total}, data={bytes_total / 1024 ** 2:.1f} MB, "
+            f"write={t_write - t0:.2f}s",
+            extra={"console": True},
+        )
 
     def _merge_csv(self, filename, batches, keep_batches):
         final_file = self.data_dir / f"{filename}.csv"
+        if final_file.exists():
+            final_file.unlink()
+
         csv_shards = [batch.with_suffix(".csv") for batch in batches]
         workers = min(self.parallel, self.merge_workers, len(batches))
 
@@ -284,9 +334,6 @@ class OutputManager:
 
         t_convert = time.perf_counter()
 
-        if final_file.exists():
-            final_file.unlink()
-
         with final_file.open("wb") as dst:
             for i, csv_file in enumerate(csv_shards):
                 with csv_file.open("rb") as src:
@@ -297,8 +344,7 @@ class OutputManager:
         t_concat = time.perf_counter()
 
         if not keep_batches:
-            for file in batches + csv_shards:
-                file.unlink()
+            self._cleanup_batch_dir(filename)
 
         logger.info(
             f"[{filename}] Completed -> {final_file} | "
@@ -309,6 +355,8 @@ class OutputManager:
 
     def _merge_hdf5(self, filename, batches, keep_batches):
         final_file = self.data_dir / f"{filename}.h5"
+        if final_file.exists():
+            final_file.unlink()
         first = True
 
         logger.info(f"[{filename}] Merging {len(batches)} batches into hdf5", extra={"console": True})
@@ -326,13 +374,14 @@ class OutputManager:
             first = False
 
         if not keep_batches:
-            for batch in batches:
-                batch.unlink()
+            self._cleanup_batch_dir(filename)
 
         logger.info(f"[{filename}] Completed -> {final_file}", extra={"console": True})
 
     def _merge_npy(self, filename, batches, keep_batches):
         final_file = self.data_dir / f"{filename}.npy"
+        if final_file.exists():
+            final_file.unlink()
 
         logger.info(f"[{filename}] Merging {len(batches)} batches into npy", extra={"console": True})
 
@@ -340,8 +389,7 @@ class OutputManager:
         np.save(final_file, np.concatenate(arrays), allow_pickle=True)
 
         if not keep_batches:
-            for batch in batches:
-                batch.unlink()
+            self._cleanup_batch_dir(filename)
 
         logger.info(f"[{filename}] Completed -> {final_file}", extra={"console": True})
 

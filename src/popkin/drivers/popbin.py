@@ -3,6 +3,7 @@
 import multiprocessing as mp
 import os
 import queue
+import shutil
 import time
 
 import numpy as np
@@ -121,9 +122,12 @@ def clean_old_outputs(filenames):
             if path.is_file():
                 path.unlink()
                 removed += 1
+            elif path.is_dir():
+                shutil.rmtree(path)
+                removed += 1
 
     if removed:
-        logger.info(f"[Cleanup] Deleted old output files: {removed}", extra={"console": True})
+        logger.info(f"[Cleanup] Deleted old outputs: {removed}", extra={"console": True})
 
 
 def log_population_progress(done, total, start_time, z, next_fraction):

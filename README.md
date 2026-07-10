@@ -250,8 +250,10 @@ binary-population outputs are handled by `OutputManager`, which writes
 intermediate batches and merges the final catalogue after the worker pool
 finishes.
 
-Supported output formats are controlled by the relevant inlist file and the
-current `OutputManager` implementation.
+Population-synthesis outputs support `parquet`, `csv`, `hdf5`, and `npy`
+formats, controlled by the relevant inlist file. `parquet` is the default and is
+recommended for large catalogues because it is compact and fast to read, while
+`csv` is mainly useful for small, human-readable outputs.
 
 ## 🏗️ Project Structure
 

@@ -49,9 +49,8 @@ popsin_output_columns = [
 # Whether to simplify output.
 # simplify_output = True
 
-# Output format: ['csv', 'hdf5', 'npy'].
-# output_format = 'csv'
+# Output format: ['parquet', 'csv', 'hdf5', 'npy'].
+# output_format = 'parquet'
 
 # Number of significant digits retained in output.
 # output_precision = 6
-

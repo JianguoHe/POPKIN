@@ -302,10 +302,11 @@ popbin_output_columns: dict[str, list[str]] = {
 simplify_output: bool = True
 
 # Output format (only for population synthesis)
-# - 'csv'   : CSV text format (human-readable, large file size, slower)
-# - 'hdf5'  : HDF5 binary format (recommended, faster, smaller file size)
-# - 'npy'   : NumPy binary format (fastest for structured arrays, minimal overhead)
-output_format: str = 'csv'
+# - 'parquet': Parquet binary format (recommended, faster, smaller file size)
+# - 'csv'    : CSV text format (human-readable, large file size, slower)
+# - 'hdf5'   : HDF5 binary format (recommended, faster, smaller file size)
+# - 'npy'    : NumPy binary format (fastest for structured arrays, minimal overhead)
+output_format: str = 'parquet'
 
 # Number of significant digits in output (CSV only)
 output_precision: int = 6
