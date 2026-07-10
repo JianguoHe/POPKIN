@@ -610,7 +610,7 @@ class SingleStar:
                 dt = pts2 * (self.tscls[5] - self.age)
             dtr = self.tn - self.age
         else:
-            dt = min(max(0.1, self.dt * 10 / 1e6), 500)
+            dt = min(max(0.1, self.dt * 10 / 1e6), 100)
             dtr = dt
 
         self.dt = max(0.1, min(dt, dtr) * 1e6)
