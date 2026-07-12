@@ -9,7 +9,8 @@ from popkin.constants import sec_per_year, Z_sun, R_sun, T_eff_sun
 from popkin.config.controls_default import max_time, max_step, ini_spin_scheme, lambda_binding, alpha_th
 from popkin.config.controls_default import (
     SNtype, CCSN_kick_model, sigma_CCSN, CCSN_kick_lognormal_mu, CCSN_kick_lognormal_sigma,
-    CCSN_kick_lognormal_vmax, sigma_ECSN, sigma_AIC, M_ECSN, M_ch, M_ns_max, WD_flag,
+    CCSN_kick_lognormal_vmax, sigma_ECSN, sigma_AIC, M_ECSN, M_ch, M_ns_max, WD_flag, 
+    compact_star_max_timestep,
 )
 from popkin.config.controls_default import mb_model, gamma_mb, wind_model, neta, bwind, f_WR, f_LBV
 from popkin.config.user_config import apply_user_config
@@ -345,6 +346,19 @@ class SingleStar:
         self.v_kick = np.full(3, np.nan)
 
     # ------------------------------------------------------------------------------------------------------------------
+    #                                                    事件映射
+    # ------------------------------------------------------------------------------------------------------------------
+    def event_map(self):
+        event_mapping = {
+            'AIC': b'AIC',
+            'ECSN': b'ECSN',
+            'CCSN': b'CCSN',
+            'Ia': b'Ia',
+            'None': b'None'
+        }
+        return event_mapping.get(self.event)
+
+    # ------------------------------------------------------------------------------------------------------------------
     #                                            为恒星设置合适的初始自旋及角动量
     # ------------------------------------------------------------------------------------------------------------------
     def _set_spin(self):
@@ -610,7 +624,7 @@ class SingleStar:
                 dt = pts2 * (self.tscls[5] - self.age)
             dtr = self.tn - self.age
         else:
-            dt = min(max(0.1, self.dt * 10 / 1e6), 100)
+            dt = min(max(0.1, self.dt * 10 / 1e6), compact_star_max_timestep)
             dtr = dt
 
         self.dt = max(0.1, min(dt, dtr) * 1e6)
@@ -818,19 +832,6 @@ class SingleStar:
         else:
             raise ValueError("Unsupported supernova event. Expected one of: 'AIC', 'ECSN', 'CCSN'.")
 
-
-    # ------------------------------------------------------------------------------------------------------------------
-    #                                                    事件映射
-    # ------------------------------------------------------------------------------------------------------------------
-    def event_map(self):
-        event_mapping = {
-            'AIC': b'AIC',
-            'ECSN': b'ECSN',
-            'CCSN': b'CCSN',
-            'Ia': b'Ia',
-            'None': b'None'
-        }
-        return event_mapping.get(self.event)
 
     # ------------------------------------------------------------------------------------------------------------------
     #                                               确定包层结合能参数lambda

@@ -415,6 +415,11 @@ class BinaryStar:
         # 保存双星的当前属性
         self.save()
 
+        # 对于发生超新星爆炸的恒星, 将其质量变化率为零, 防止继续演化
+        for star in [self.star1, self.star2]:
+            if star.event in {'AIC', 'ECSN', 'CCSN', 'Ia'}:
+                star.mdot = star.mdot_wind = star.mdot_wind_loss = star.mdot_wind_acc = star.mdot_mt = 0
+
         # 重置各类速度
         self.star1.event = 'None'
         self.star2.event = 'None'

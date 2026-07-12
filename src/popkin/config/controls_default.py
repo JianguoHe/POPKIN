@@ -24,6 +24,9 @@ max_step: int = 20000
 #         - Orbit integration
 max_time: float = 12000.0
 
+# Maximum timestep for compact stars (WD/NS/BH), in Myr.
+compact_star_max_timestep: float = 200.0
+
 # Whether to use numba.jit decorator for acceleration. Recommended for binary population synthesis.
 jit_enabled: bool = False
 
