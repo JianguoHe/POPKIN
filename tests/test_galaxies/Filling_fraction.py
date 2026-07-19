@@ -40,13 +40,15 @@ def filling_fraction():
     plt.yscale('log')
     # plt.grid(color='gray', linestyle='--', alpha=0.5)
     plt.grid(True, which="both", ls="-", alpha=0.2)
+    ax = plt.gca()
+    ax.tick_params(axis='both', which='both', top=True, right=True,
+                   labeltop=False, labelright=False, direction='in')
     plt.legend()
     plt.tight_layout()
     plt.savefig(SCRIPT_DIR / 'figures' / 'filling_fraction.pdf', dpi=300)
     plt.show()
 
 filling_fraction()
-
 
 
 

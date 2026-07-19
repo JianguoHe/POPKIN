@@ -41,6 +41,9 @@ def sfr():
     plt.xlabel(r'$\tau~ (\mathrm{Gyr})$')
     plt.ylabel(r'SFR $(M_{\odot} / \mathrm{yr})$')
     plt.grid(True, alpha=0.3)
+    ax = plt.gca()
+    ax.tick_params(axis='both', which='both', top=True, right=True,
+                   labeltop=False, labelright=False, direction='in')
     plt.legend()
     plt.tight_layout()
     plt.savefig(SCRIPT_DIR / 'figures' / 'SFR.pdf', dpi=300, bbox_inches='tight')

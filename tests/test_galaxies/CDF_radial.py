@@ -60,6 +60,9 @@ plt.scatter(max_slope_R, max_slope_CDF, marker='o', edgecolor='black', facecolor
 plt.xlabel(r'$R$ (kpc)')
 plt.ylabel('CDF')
 plt.grid(True, which="both", ls="-", alpha=0.3)
+ax = plt.gca()
+ax.tick_params(axis='both', which='both', top=True, right=True,
+               labeltop=False, labelright=False, direction='in')
 # plt.legend(fontsize=12)
 plt.legend(title='Lookback Time')
 plt.xlim(0, 25)
