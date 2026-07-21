@@ -4,86 +4,127 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DOI](https://img.shields.io/badge/DOI-10.xxxx/xxxxx-blue)](https://doi.org/10.xxxx/xxxxx)
 
-POPKIN is a Python framework for rapid stellar evolution, binary evolution,
-population synthesis, and Galactic kinematics. It is built from the
-first-generation rapid binary-evolution framework of BSE and reorganized into a
-modular Python codebase for transparent model development and large population
-calculations.
+POPKIN is a modular Python framework for rapid single-star evolution, 
+binary-star evolution, population synthesis, and stellar kinematics. 
+It was developed to connect compact-object formation physics with the
+present-day positions, velocities, and observable signatures of stellar
+populations in the Milky Way.
 
-POPKIN currently supports single-star evolution, binary-star evolution,
-single-star population synthesis, and binary population synthesis. Population
-synthesis can be coupled to a Milky Way model, metallicity evolution, Galactic
-orbit integration, and selected observable calculations such as compact-binary
-gravitational-wave signal-to-noise ratios and isolated black-hole accretion from
-the interstellar medium.
+The code builds on the classic Binary Star Evolution (BSE) framework and
+reorganizes the calculation into an inspectable, object-oriented Python
+codebase. In addition to intrinsic stellar and binary evolution, POPKIN couples
+synthetic populations to Galactic birth environments, star-formation and
+metallicity histories, orbit integration in the Galactic potential,
+interstellar-medium properties, and observable post-processing such as
+compact-binary gravitational-wave signal-to-noise ratios, isolated black-hole
+accretion, and microlensing observables.
 
-> Development status: POPKIN is under active development. Interfaces and
-> default physical prescriptions may change before a stable public release.
+> Development status: POPKIN is under active development. Interfaces, default
+> prescriptions, and example workspaces may change before a stable public
+> release.
 
-## ✨ Features
+## 💡 Why POPKIN
+Modern compact-object surveys increasingly require models that do more than
+evolve binaries in isolation. For Galactic isolated black holes (IBHs), neutron
+stars, compact binaries, and runaway systems, the observable population is
+shaped jointly by stellar evolution, binary disruption, natal kicks, Galactic
+star-formation history, chemical enrichment, orbital motion, and survey
+selection.
 
-### 🔭 Core Capabilities
+POPKIN is designed for this coupled problem. It provides:
 
-- **Single-star evolution**: evolve stars from the zero-age main sequence to
-  compact remnants with configurable stellar-wind, remnant, and supernova
-  prescriptions.
-- **Binary-star evolution**: model Roche-lobe overflow, mass transfer, tides,
-  common-envelope evolution, supernova mass loss, natal kicks, binary
+- **Star evolution**: rapid single-star and binary-star evolution 
+  from the zero-age main sequence to remnants.
+- **Population synthesis**: population synthesis for single and binary 
+  stellar systems with statistical weights.
+- **Galactic evolution history**: a Milky Way model with thin-disk, thick-disk, 
+  and bulge star formation, chemical enrichment, and interstellar-medium phases.
+- **Orbital motion tracking**: piecewise Galactic orbit integration for systems 
+  whose velocities change after supernovae, binary disruption, or mergers.
+- **Post-processing**: tools for turning synthetic populations into observable
+  quantities.
+
+These components can be used to study compact-object populations, Galactic
+compact binaries, runaway and disrupted systems, isolated black-hole accretion,
+X-ray binaries, electromagnetic transients, microlensing, compact-binary
+gravitational-wave sources, and related survey predictions.
+
+
+## 🏗️ Architecture
+
+The architecture of POPKIN is shown below:
+
+![POPKIN structure](/POPKIN_structure.png)
+
+POPKIN is organized around four connected layers.
+
+- **Galactic model**: star-formation history, chemical enrichment, Galactic
+   components, birth positions, and interstellar-medium phases.
+- **Stellar physics**: single-star evolution, binary-star evolution, winds,
+   magnetic braking, mass transfer, common-envelope evolution, remnant
+   formation, and natal kicks.
+- **Kinematic evolution**: orbit integration in the Galactic potential using
+   `galpy`, including velocity changes caused by supernovae and disrupted
+   binaries.
+- **Observable post-processing**: compact-binary gravitational-wave
+   signal-to-noise ratios, accretion from the ISM, and microlensing quantities
+   for compact lenses.
+
+The current framework treats non-single stellar systems as binaries. Multiple
+systems, star clusters, time-dependent Galactic potentials, and more detailed
+survey models are planned extension points.
+
+
+## ⚡ Main Features
+
+### ✨ Stellar and Binary Evolution
+
+- Single-star evolution from the ZAMS to white dwarfs, neutron stars, and black
+  holes.
+- Binary evolution with Roche-lobe overflow, tides, stable and unstable mass
+  transfer, common-envelope evolution, supernova mass loss, natal kicks, binary
   disruption, and mergers.
-- **Population synthesis**: run single-star and binary population synthesis
-  with configurable initial grids, metallicity models, target-source criteria,
-  and output columns.
-- **Galactic modelling**: couple populations to Milky Way star-formation
-  history, chemical enrichment, Galactic structure, and interstellar-medium
-  phases.
-- **Stellar kinematics**: integrate Galactic orbits with `galpy` and record
-  present-day positions, velocities, and observable astrometric quantities.
+- Configurable prescriptions for stellar winds, remnant masses, natal kicks,
+  common-envelope binding energy, magnetic braking, and accretion efficiency.
+- Core `SingleStar` and `BinaryStar` classes that can be used directly for
+  detailed evolutionary-track studies.
 
-### 🛠️ Technical Highlights
+### 📊 Population Synthesis
 
-- **Configuration-driven workflow**: control physical prescriptions, runtime
-  options, source selection, and outputs through workspace-level Python
-  configuration files.
-- **Parallel population synthesis**: use multiprocessing for large parameter
-  grids and asynchronous output writing for large binary-population catalogues.
-- **Optional JIT acceleration**: use Numba to accelerate repeated stellar and
-  binary evolution calculations.
-- **Structured output management**: write selected output columns, intermediate
-  batches, merged catalogues, and runtime logs in a reproducible workspace.
-- **Modular source tree**: separate stellar physics, galaxy models, kinematics,
-  physics utilities, observables, and drivers for easier extension.
+- Single-star population synthesis over stellar initial mass.
+- Binary population synthesis over primary mass, secondary mass, and orbital
+  period or separation.
+- Mass-dependent binary fractions, configurable initial distributions, and
+  statistical weights for synthetic populations.
+- Constant-metallicity calculations and Galactic chemical-enrichment based
+  calculations.
+- User-defined source-selection criteria and output columns.
 
-### 📊 Physics and Observable Modules
+### 💫 Galactic Kinematics
 
-- **Stellar and binary physics**: winds, magnetic braking, mass-transfer
-  stability, common-envelope evolution, compact-remnant formation, and natal
-  kicks.
-- **Supernova prescriptions**: rapid, delayed, and stochastic explosion models,
-  with configurable CCSN, ECSN, and AIC kick prescriptions.
-- **Metallicity models**: constant-metallicity calculations and Galactic
-  chemical-enrichment based population synthesis.
-- **Gravitational waves**: LISA signal-to-noise estimates for compact binaries,
-  with source-selection helpers for precomputed SNR columns.
-- **Isolated black-hole accretion**: post-processing summaries for black holes
-  accreting from different ISM phases.
+- Birth positions and formation rates tied to the Milky Way star-formation and
+  metallicity model.
+- Orbit integration with `galpy` and `MWPotential2014`; an optional Galactic
+  center supermassive black hole contribution can be added for inner-Galaxy studies.
+- Piecewise orbit integration when supernovae, natal kicks, or binary
+  disruption change a system's velocity state.
+- Present-day Galactocentric and sky-coordinate outputs for synthetic sources.
 
-### ⚡ Application Areas
+### 🔭 Observable Modules
 
-- **Compact-object populations**: white dwarfs, neutron stars, stellar-mass
-  black holes, and their binary combinations.
-- **Galactic compact binaries**: NS-NS, BH-BH, NS-BH, NS-WD, and WD-WD systems,
-  including potential Galactic gravitational-wave sources.
-- **Runaway and disrupted systems**: kinematic outcomes of supernova kicks,
-  binary disruption, and post-supernova orbital evolution.
-- **Population-level observables**: catalogue-level analysis of source numbers,
-  spatial distributions, accretion properties, and gravitational-wave
-  detectability.
-- **Future extensions**: X-ray binary observables, electromagnetic transients,
-  microlensing, and survey-selection tools are planned extension points.
+- Compact-binary GW SNR estimates, currently configured for LISA-style
+  calculations through `LEGWORK`.
+- Accreting IBH post-processing using ISM phase information, Bondi-Hoyle gas
+  capture, radiatively inefficient accretion-flow corrections, luminosities,
+  and fluxes.
+- Compact-object microlensing quantities, including relative proper motion,
+  angular Einstein radius, Einstein crossing time, and event-rate weights for
+  user-selected lens catalogues.
+
 
 ## 🚀 Installation
 
-POPKIN is recommended to be installed in a dedicated Conda environment.
+We recommend installing POPKIN in a dedicated Conda environment.
 
 Run the following commands in the directory where you want to place the POPKIN
 source tree:
@@ -132,7 +173,7 @@ python run.py
 The selected program is controlled by `program` in `inlist.py`:
 
 ```python
-program = "popbin"  # "sse", "bse", "popsin", or "popbin"
+program = "sse"  # "sse", "bse", "popsin", or "popbin"
 ```
 
 Program-specific settings are placed in the corresponding configuration file:
@@ -162,7 +203,7 @@ through local configuration files.
 - common-envelope, mass-transfer, stellar-wind, magnetic-braking, and
   supernova prescriptions;
 - natal-kick models, including the default Hobbs et al. Maxwellian model and an
-  optional Disberg & Mandel lognormal CCSN kick model.
+  optional Disberg & Mandel 2025 lognormal CCSN kick model.
 
 ### Program-Specific Configuration
 
@@ -250,10 +291,12 @@ binary-population outputs are handled by `OutputManager`, which writes
 intermediate batches and merges the final catalogue after the worker pool
 finishes.
 
-Population-synthesis outputs support `parquet`, `csv`, `hdf5`, and `npy`
-formats, controlled by the relevant inlist file. `parquet` is the default and is
-recommended for large catalogues because it is compact and fast to read, while
-`csv` is mainly useful for small, human-readable outputs.
+For population-synthesis runs (`popsin` and `popbin`), merged catalogue outputs
+support `parquet`, `csv`, `hdf5`, and `npy` formats, controlled by the relevant
+inlist file. `parquet` is the default and is recommended for large catalogues
+because it is compact and fast to read, while `csv` is mainly useful for small,
+human-readable outputs. Single-track `sse` and `bse` runs write CSV evolution
+tracks.
 
 ## 🏗️ Project Structure
 
@@ -268,7 +311,7 @@ POPKIN/
 │   ├── binding_energy/      # common-envelope binding-energy prescriptions
 │   ├── metallicity/         # metallicity-dependent stellar fitting coefficients
 │   ├── physics/             # reusable physics relations
-│   ├── observables/         # GW, isolated-BH accretion, and planned observables
+│   ├── observables/         # GW, accretion, microlensing, and survey utilities
 │   ├── constants.py         # physical constants and structured output dtypes
 │   └── utils.py             # shared utility functions
 ├── tests/                   # development tests and validation scripts
@@ -286,14 +329,20 @@ Current observable and post-processing modules include:
   and helpers for selecting sources above a precomputed SNR threshold.
 - `observables/isolated_bh_accretion.py`: post-processing summaries for
   isolated black holes accreting from different ISM phases.
+- `observables/microlensing.py`: compact-lens microlensing quantities, including
+  relative proper motion, angular Einstein radius, Einstein crossing time, and
+  event-rate weights.
+- `observables/survey_selection.py`: shared flux, luminosity, and threshold
+  selection utilities.
+- `observables/xray_binaries.py`: basic luminosity, flux, and candidate-selection
+  helpers for X-ray binaries and related accreting systems.
+- `observables/electromagnetic_transients.py`: lightweight event-selection and
+  compact-merger classification utilities.
 
-The following modules are present as early-stage extension points and will be
-expanded in future versions:
-
-- X-ray binary observables.
-- Electromagnetic transient utilities.
-- Microlensing observables.
-- Survey-selection utilities.
+The X-ray binary and electromagnetic-transient modules are intentionally
+lightweight at this stage. More detailed prescriptions for duty cycles, spectral
+states, beaming, ejecta properties, light curves, and survey-specific selection
+functions can be added in future versions.
 
 ## 🛠️ Development Notes
 
@@ -307,17 +356,16 @@ Binary population synthesis can generate very large catalogues. Prefer selecting
 only the columns needed for a scientific application and use program-specific
 source-selection criteria to keep outputs manageable.
 
-## 🧪 Testing
+## 🧪 Testing and Validation
 
-Run the available tests from the repository root:
+The repository currently includes development and validation scripts under
+`tests/`. These scripts are mainly used to check individual physics modules,
+galaxy-model utilities, orbit integration, and plotting diagnostics during
+development.
 
-```bash
-pytest tests/
-```
-
-Some scripts under `tests/` are exploratory validation or plotting scripts
-rather than formal unit tests, so the test suite should be treated as a
-development aid rather than a complete release validation suite.
+They are not yet organized as a complete automated `pytest` test suite. Users
+who wish to run them should inspect each script first, since some scripts may
+generate figures, write diagnostic files, or require optional dependencies.
 
 ## 📝 Citation
 
@@ -325,13 +373,22 @@ If you use POPKIN in a publication, please cite the POPKIN paper when available.
 For the underlying BSE framework, cite:
 
 ```bibtex
-@article{Hurley2002,
-  author  = {Hurley, J. R. and Tout, C. A. and Pols, O. R.},
-  title   = {Evolution of binary stars and the effect of tides on binary populations},
-  journal = {Monthly Notices of the Royal Astronomical Society},
-  year    = {2002},
-  volume  = {329},
-  pages   = {897--928}
+@ARTICLE{Hurley2002,
+       author = {{Hurley}, Jarrod R. and {Tout}, Christopher A. and {Pols}, Onno R.},
+        title = "{Evolution of binary stars and the effect of tides on binary populations}",
+      journal = {\mnras},
+     keywords = {METHODS: ANALYTICAL, METHODS: STATISTICAL, BINARIES: GENERAL, STARS: EVOLUTION, STARS: VARIABLES: OTHER, GALAXIES: STELLAR CONTENT, Astrophysics},
+         year = 2002,
+        month = feb,
+       volume = {329},
+       number = {4},
+        pages = {897-928},
+          doi = {10.1046/j.1365-8711.2002.05038.x},
+archivePrefix = {arXiv},
+       eprint = {astro-ph/0201220},
+ primaryClass = {astro-ph},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2002MNRAS.329..897H},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 ```
 
@@ -341,8 +398,7 @@ used in a given calculation, such as `NumPy`, `SciPy`, `Astropy`, `Numba`,
 
 ## 📄 License
 
-POPKIN is intended to be released under the MIT License. See `LICENSE` for the
-license text.
+POPKIN is released under the MIT License. See `LICENSE` for the license text.
 
 ## 📬 Contact
 

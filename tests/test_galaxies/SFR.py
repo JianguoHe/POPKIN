@@ -13,18 +13,18 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 def sfr():
     galaxy = MilkyWay()
 
-    # 创建时间网格
+    # Create a time grid.
     tau = np.linspace(0, 12, 1000)
 
-    # 计算各成分的 SFR
+    # Compute the SFR of each component.
     sfr_bulge = galaxy.bulge.sfr(tau)
     sfr_thin = galaxy.thin_disk.sfr(tau)
     sfr_thick = galaxy.thick_disk.sfr(tau)
 
-    # 计算总 SFR
+    # Compute the total SFR.
     sfr_total = sfr_bulge + sfr_thin + sfr_thick
 
-    # 绘图
+    # Plot.
     plt.rcParams.update({
         'axes.labelsize': 20,
         'xtick.labelsize': 20,

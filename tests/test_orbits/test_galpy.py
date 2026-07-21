@@ -22,7 +22,7 @@ v_cir = mwp14.vcirc(R=Rs)
 # # v_cir = calcRotcurve(mwp14, Rs=Rs)
 # end = time.time()
 #
-# print(f"耗时: {(end - start) * 1000:.2f} 毫秒")
+# print(f"Elapsed time: {(end - start) * 1000:.2f} ms")
 print(v_cir[:5])
 
 
@@ -49,7 +49,7 @@ for _ in range(1):
     # ra, dec, pm_ra, pm_dec = o.ra, o.dec, o.pmra, o.pmdec
 
 end = time.time()
-print(f"运行时间: {end - start:.4f} 秒")
+print(f"Runtime: {end - start:.4f} s")
 plt.plot(o.x(ts), o.y(ts))
 plt.show()
 # print(o.pmll(ts))
@@ -60,8 +60,8 @@ plt.show()
 #
 # end = time.time()
 # print(R)
-# print(f"运行时间R: {end - start:.4f} 秒")
-print('最后状态：', o.vxvv)
+# print(f"Runtime R: {end - start:.4f} s")
+print('Final state:', o.vxvv)
 R = o.R(ts)
 z = o.z(ts)
 phi = o.phi(ts)
@@ -85,7 +85,7 @@ print(df.head(10))
 # ini_vz = 10 / 220
 # ini_vT = calcRotcurve(mwp14, Rs=ini_R)[0] + 10 / 220
 
-# 创建初始 Orbit 对象
+# Create the initial Orbit object.
 
 o = Orbit([R/8, vR/220, vT/220, z/8, vz/220, phi], ro=8., vo=220.)
 
@@ -99,7 +99,7 @@ o = Orbit([R/8, vR/220, vT/220, z/8, vz/220, phi], ro=8., vo=220.)
 #
 # end = time.time()
 # print(result)
-# print(f"运行时间R: {end - start:.4f} 秒")
+# print(f"Runtime R: {end - start:.4f} s")
 
 df = pd.DataFrame({
     'time_Gyr': ts.value,
@@ -113,7 +113,6 @@ df = pd.DataFrame({
 print(df.head(10))
 print(o.R())
 # print(o.vxvv[-1])
-
 
 
 

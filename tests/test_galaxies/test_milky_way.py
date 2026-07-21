@@ -16,53 +16,53 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def use_example():
-    # 创建银河系实例
+    # Create a Milky Way instance.
     galaxy = MilkyWay()
 
     print("=" * 50)
-    print(" " * 15, "银河系模型演示")
+    print(" " * 15, "Milky Way model demo")
     print("=" * 50)
 
-    # 1. 银河系基本信息
-    print("\n1. 银河系基本信息:")
+    # 1. Basic Milky Way information.
+    print("\n1. Basic Milky Way information:")
     galaxy.info(pretty_print=True)
 
-    # 2. 恒星形成率
-    print("\n2. 恒星形成率:")
+    # 2. Star formation rate.
+    print("\n2. Star formation rate:")
     tau = 7.0
-    print(f"在 tau={tau} Gyr 时:")
-    print(f"  薄盘: {galaxy.thin_disk.sfr(tau):.3f} Msun/yr")
-    print(f"  厚盘: {galaxy.thick_disk.sfr(tau):.3f} Msun/yr")
-    print(f"  核球: {galaxy.bulge.sfr(tau):.3f} Msun/yr")
-    print(f"  总计: {galaxy.sfr(tau):.3f} Msun/yr")
+    print(f"At tau={tau} Gyr:")
+    print(f"  Thin disk: {galaxy.thin_disk.sfr(tau):.3f} Msun/yr")
+    print(f"  Thick disk: {galaxy.thick_disk.sfr(tau):.3f} Msun/yr")
+    print(f"  Bulge: {galaxy.bulge.sfr(tau):.3f} Msun/yr")
+    print(f"  Total: {galaxy.sfr(tau):.3f} Msun/yr")
 
-    # 3. 径向分布
-    print("\n3. 径向累计分布:")
+    # 3. Radial distribution.
+    print("\n3. Radial cumulative distribution:")
     R = 20.0  # kpc
-    print(f"在 R={R} kpc 处:")
-    print(f"  薄盘分布: {galaxy.thin_disk.radial_cdf(R, tau=0):.4f}")
-    print(f"  厚盘分布: {galaxy.thick_disk.radial_cdf(R):.4f}")
-    print(f"  核球分布: {galaxy.bulge.radial_cdf(R):.4f}")
-    print(f"  总分布: {galaxy.radial_cdf(R, tau=0):.4f}")
+    print(f"At R={R} kpc:")
+    print(f"  Thin-disk distribution: {galaxy.thin_disk.radial_cdf(R, tau=0):.4f}")
+    print(f"  Thick-disk distribution: {galaxy.thick_disk.radial_cdf(R):.4f}")
+    print(f"  Bulge distribution: {galaxy.bulge.radial_cdf(R):.4f}")
+    print(f"  Total distribution: {galaxy.radial_cdf(R, tau=0):.4f}")
 
-    # 4. ISM信息
-    print("\n4. 星际介质信息:")
-    print(f"R=8 kpc 处:")
-    print(f"  分子云面密度: {galaxy.molecular_clouds.surface_density(8):.3f} Msun/pc^2")
-    print(f"  HI总面密度: {galaxy.cold_hi.total_surface_density(8):.3f} Msun/pc^2")
-    print(f"  冷HI面密度: {galaxy.cold_hi.surface_density(8):.3f} Msun/pc^2")
-    print(f"  暖HI面密度: {galaxy.warm_hi.surface_density(8):.3f} Msun/pc^2")
-    print(f"  分子云填充因子: {galaxy.molecular_clouds.filling_fraction(8):.4f}")
-    print(f"  冷HI填充因子: {galaxy.cold_hi.filling_fraction(8):.4f}")
-    print(f"  暖HI填充因子: {galaxy.warm_hi.filling_fraction(8):.4f}")
+    # 4. ISM information.
+    print("\n4. ISM information:")
+    print(f"At R=8 kpc:")
+    print(f"  Molecular-cloud surface density: {galaxy.molecular_clouds.surface_density(8):.3f} Msun/pc^2")
+    print(f"  Total HI surface density: {galaxy.cold_hi.total_surface_density(8):.3f} Msun/pc^2")
+    print(f"  Cold HI surface density: {galaxy.cold_hi.surface_density(8):.3f} Msun/pc^2")
+    print(f"  Warm HI surface density: {galaxy.warm_hi.surface_density(8):.3f} Msun/pc^2")
+    print(f"  Molecular-cloud filling factor: {galaxy.molecular_clouds.filling_fraction(8):.4f}")
+    print(f"  Cold HI filling factor: {galaxy.cold_hi.filling_fraction(8):.4f}")
+    print(f"  Warm HI filling factor: {galaxy.warm_hi.filling_fraction(8):.4f}")
 
-    # 5. 生成恒星
-    print("\n6. 生成恒星:")
+    # 5. Generate stars.
+    print("\n6. Generate stars:")
     tau_single = 3
     tau_mutil = np.array([3.2, 4.3, 12])
     stars = galaxy.generate_star(tau=tau_mutil)
     print(json.dumps(stars, indent=4, ensure_ascii=False))
-    print(f"  这批恒星的银心径向距离R为: {np.array([star['R'] for star in stars])}")
+    print(f"  Galactocentric radial distances R for these stars: {np.array([star['R'] for star in stars])}")
 
 
 
@@ -72,7 +72,7 @@ def pdf():
     stars = galaxy.generate_star(tau, weight=1e-6)
 
     pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', None)  # 不换行
+    pd.set_option('display.width', None)  # Do not wrap lines.
     stars = pd.DataFrame(stars)
     print(stars)
     stars.to_csv(SCRIPT_DIR / 'stars.csv', index=False)
@@ -89,7 +89,7 @@ def pdf():
     #     # tau = np.array([0, 2, 9])
     #     stars = galaxy.generate_star(tau, weight=1e-6)
     # time_original = time.time() - start
-    # print(f"耗时: {time_original:.4f} 秒)")
+    # print(f"Elapsed time: {time_original:.4f} s)")
 
 
 def test_ISM():

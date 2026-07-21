@@ -26,7 +26,7 @@ def filling_fraction():
     filling_fractions_warm_HII = galaxy.warm_hii.filling_fraction(R=r_values)
     filling_fractions_hot_HII = galaxy.hot_hii.filling_fraction(R=r_values)
 
-    # 绘制填充因子图
+    # Plot filling factors.
     plt.figure(figsize=(10, 7))
     plt.plot(r_values, filling_fractions_H2, label='MCs', color='#1f77b4', linewidth=2)
     plt.plot(r_values, filling_fractions_cold_HI, label=r'$\rm cold~H_{I}$', color='#ff7f0e', linewidth=2)
@@ -49,7 +49,6 @@ def filling_fraction():
     plt.show()
 
 filling_fraction()
-
 
 
 

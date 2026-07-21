@@ -25,7 +25,7 @@ maintainers = [
 
 requires-python = ">=3.14"
 
-# 项目依赖
+# Project dependencies.
 dependencies = [
     "astropy>=7.2.0",
     "numpy>=2.0,<2.4",
@@ -38,48 +38,48 @@ dependencies = [
     "tables>=3.11.0",
 ]
 
-# 可选依赖
+# Optional dependencies.
 [project.optional-dependencies]
 dev = [
     "gala>=1.11.0",
 ]
 
-# 项目 URL
+# Project URLs.
 [project.urls]
 Homepage = "https://github.com/JianguoHe/POPKIN"
 Documentation = "https://github.com/JianguoHe/POPKIN#readme"
 Repository = "https://github.com/JianguoHe/POPKIN.git"
 Issues = "https://github.com/JianguoHe/POPKIN/issues"
 
-# 包配置
+# Package configuration.
 [tool.setuptools]
-# 包在 src 目录下
+# Packages are under the src directory.
 package-dir = {"" = "src"}
-# 自动发现包
+# Automatically discover packages.
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["popkin*"]
 #exclude = ["tests*", "docs*"]
 
-# 包含数据文件
+# Include data files.
 [tool.setuptools.package-data]
 popkin = [
     "binding_energy/**/*",
 ]
 
-## 黑帽格式化配置（可选）
+## Black formatting configuration (optional).
 #[tool.black]
 #line-length = 88
 #target-version = ['py38']
 #include = '\.pyi?$'
 #
-## pytest 配置（可选）
+## pytest configuration (optional).
 #[tool.pytest.ini_options]
 #minversion = "7.0"
 #testpaths = ["tests"]
 #python_files = ["test_*.py", "*_test.py"]
 #
-## mypy 配置（可选）
+## mypy configuration (optional).
 #[tool.mypy]
 #python_version = "3.8"
 #ignore_missing_imports = true

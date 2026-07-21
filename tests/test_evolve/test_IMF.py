@@ -5,20 +5,20 @@ from scipy import integrate
 
 def average_stellar_mass() -> float:
 
-    # 积分网格
+    # Integration grid.
     masses = np.linspace(0.08, 100, 100000)
 
-    # 初始质量函数值
+    # Initial mass function values.
     imf = imf_kroupa2002(masses)
 
-    # 双星比例
+    # Binary fraction.
     fb = 0.5 + 0.25 * np.log10(masses)
 
-    # 系统总质量：双星系统平均 1.5 × M，单星系统为 M
+    # Total system mass: binary systems average 1.5 x M, while single-star systems have M.
     system_mass = fb * 1.5 * masses + (1 - fb) * masses
     system_mass = (1 + 0.5 * fb) * masses
 
-    # 数值积分
+    # Numerical integration.
     numerator = integrate.trapezoid(imf * system_mass, masses)
     denominator = integrate.trapezoid(imf, masses)
 

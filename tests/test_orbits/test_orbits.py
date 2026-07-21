@@ -59,7 +59,7 @@ for index in index_list:
         o.integrate()
     # time.sleep(3)
 end = time.time()
-print(f"耗时: {(end - start)*1000:.2f} 毫秒")
+print(f"Elapsed time: {(end - start)*1000:.2f} ms")
 
 df = pd.DataFrame(merge_structured_data([o.data, o.orbit_data]))
 df.to_csv(SCRIPT_DIR / 'test_orbit.csv', index=False, float_format='%.4g')

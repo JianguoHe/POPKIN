@@ -10,16 +10,16 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 galaxy = MilkyWay()
 
 
-# R的范围
+# R range.
 R = np.linspace(0, 25, 1000)
 
-# 不同的tau值
+# Different tau values.
 tau_values = range(0, 13)
 
-# 使用调色板
+# Use a color palette.
 cmap = plt.get_cmap('coolwarm', len(tau_values))
 
-# 从 colormap 获取颜色
+# Get colors from the colormap.
 colors = cmap(np.linspace(0, 1, len(tau_values)))
 
 plt.rcParams.update({
@@ -30,31 +30,31 @@ plt.rcParams.update({
     'legend.title_fontsize': 14,
 })
 
-max_slope_points = []  # 存储 (tau, R_max_slope, CDF_max_slope)
+max_slope_points = []  # Store (tau, R_max_slope, CDF_max_slope).
 
-# 绘图
+# Plot.
 plt.figure(figsize=(8, 6))
 
 for i, tau in enumerate(tau_values):
-    # 计算CDF值
+    # Compute CDF values.
     CDF_values = galaxy.radial_cdf(R, tau)
 
-    dR = R[1] - R[0]  # R 是均匀间隔的，所以步长固定
-    PDF_values = np.gradient(CDF_values, dR)  # 计算导数（斜率）
-    max_slope_idx = np.argmax(PDF_values)  # 找到最大斜率的索引
-    R_max_slope = R[max_slope_idx]  # 对应的 R 值
-    CDF_max_slope = CDF_values[max_slope_idx]  # 对应的 CDF 值
+    dR = R[1] - R[0]  # R is uniformly spaced, so the step size is fixed.
+    PDF_values = np.gradient(CDF_values, dR)  # Compute the derivative (slope).
+    max_slope_idx = np.argmax(PDF_values)  # Find the index of the maximum slope.
+    R_max_slope = R[max_slope_idx]  # Corresponding R value.
+    CDF_max_slope = CDF_values[max_slope_idx]  # Corresponding CDF value.
     max_slope_points.append((tau, R_max_slope, CDF_max_slope))
     # print(tau, R_max_slope, CDF_max_slope)
 
     plt.plot(R, CDF_values, label=f'τ = {tau} Gyr', color=cmap(i))
 
-# 提取并绘制最大斜率点
+# Extract and plot the maximum-slope points.
 max_slope_taus = [point[0] for point in max_slope_points]
 max_slope_R = [point[1] for point in max_slope_points]
 max_slope_CDF = [point[2] for point in max_slope_points]
 
-# 用散点标记最大斜率点
+# Mark maximum-slope points with scatter points.
 plt.scatter(max_slope_R, max_slope_CDF, marker='o', edgecolor='black', facecolor=colors, s=30, zorder=5)
 
 plt.xlabel(r'$R$ (kpc)')

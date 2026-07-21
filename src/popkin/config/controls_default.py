@@ -430,7 +430,7 @@ target_popbin: list = [
 # Binding energy parameter:
 # - 'WJL2016':                    λ from Wang et al. (2016) (doi: 10.1088/1674–4527/16/8/126)
 # - 'XL2010':                     λ from Nanjing group (Xu & Li 2010) (doi:10.1088/0004-637X/716/1/114)
-lambda_binding: str = 'WJL2016'
+lambda_binding: str = 'XL2010'
 
 # Fraction of internal energy available to eject the envelope
 #
