@@ -268,6 +268,10 @@ def lambda_XL2010(
         if stage == 3 and mass0 in {3, 4}:
             lambda_b = 10 ** lambda_polynomial_fitting(R, coefficients_b)
 
+    # Apply lower bound to prevent unphysical negative values from polynomial extrapolation
+    lambda_b = max(0.05, lambda_b)
+    lambda_g = max(0.05, lambda_g)
+
     return lambda_b, lambda_g
 
 

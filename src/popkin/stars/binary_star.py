@@ -585,8 +585,23 @@ class BinaryStar:
             # 两个富氢恒星
             elif (stars[i].type in {0, 1, 2} or (stars[i].type == 4 and stars[i].mass0 >= 12)) and stars[
                 1 - i].type <= 2:
-                qc = MT_stability_MS(stars[i].type, stars[i].mass0, stars[1 - i].mass0, self.data[0]['period'],
-                                     mass_accretion_model=mass_accretion_model)
+                # ZAMS 充满洛希瓣
+                if self.step == 0:
+                    mass1i = self.star1.mass
+                    mass2i = self.star2.mass
+                    tbi = self.period * day_per_year
+                # ZAMS 未充满洛希瓣
+                else:
+                    mass1i = self.data[0]['m1']
+                    mass2i = self.data[0]['m2']
+                    tbi = self.data[0]['period']
+                # print(i, self.step, mass1i, mass2i, tbi)
+                if i == 0:
+                    qc = MT_stability_MS(stars[i].type, mass1i, mass2i, tbi, mass_accretion_model)
+                else:
+                    qc = MT_stability_MS(stars[i].type, mass2i, mass1i, tbi, mass_accretion_model)
+                # qc = MT_stability_MS(stars[i].type, stars[i].mass0, stars[1 - i].mass0, self.data[0]['period'],
+                #                      mass_accretion_model=mass_accretion_model)
                 if q[i] > qc:
                     stable = False
                 else:
