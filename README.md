@@ -33,10 +33,9 @@ selection.
 
 POPKIN is designed for this coupled problem. It provides:
 
-- **Star evolution**: rapid single-star and binary-star evolution 
+- **Stellar evolution**: rapid single-star and binary-star evolution 
   from the zero-age main sequence to remnants.
-- **Population synthesis**: population synthesis for single and binary 
-  stellar systems with statistical weights.
+- **Population synthesis**: population synthesis for single- and binary-star systems with statistical weights.
 - **Galactic evolution history**: a Milky Way model with thin-disk, thick-disk, 
   and bulge star formation, chemical enrichment, and interstellar-medium phases.
 - **Orbital motion tracking**: piecewise Galactic orbit integration for systems 
