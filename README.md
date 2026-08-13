@@ -223,8 +223,8 @@ dictionaries, and expressions directly.
 
 ### Single-Star Evolution
 
-Use `program = "sse"` in `inlist.py` and configure the stellar mass,
-metallicity, and output options in `inlist_sse.py`.
+Use `program = "sse"` in `inlist.py`, set the metallicity in `inlist.py`,
+and configure the stellar mass and output options in `inlist_sse.py`.
 
 The underlying class can also be used directly:
 
@@ -238,8 +238,8 @@ star_track = star.data
 
 ### Binary-Star Evolution
 
-Use `program = "bse"` in `inlist.py` and configure the initial binary in
-`inlist_bse.py`.
+Use `program = "bse"` in `inlist.py`, set the metallicity in `inlist.py`,
+and configure the initial binary in `inlist_bse.py`.
 
 The core binary class can be used directly:
 

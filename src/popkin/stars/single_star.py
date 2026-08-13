@@ -1155,9 +1155,9 @@ class SingleStar:
                     self.mass = 1.4
                     self.f_fb = 0.0
                 elif np.random.random() <= 0.15:
-                    self.type = 14
                     self.f_fb = ccsn_remnant_maltsev_fallback
                     self.mass = 1.4 + (mcbagb - 1.4) * self.f_fb
+                    self.type = 14 if self.mass > max_ns_mass else 13
                 else:
                     self.type = 13
                     self.mass = 1.4
@@ -1165,9 +1165,9 @@ class SingleStar:
             elif ccsn_remnant_maltsev_fallback_model == 'B':
                 # Model B: use a uniform 10% fallback-BH probability across the intermediate region.
                 if np.random.random() <= 0.10:
-                    self.type = 14
                     self.f_fb = ccsn_remnant_maltsev_fallback
                     self.mass = 1.4 + (mcbagb - 1.4) * self.f_fb
+                    self.type = 14 if self.mass > max_ns_mass else 13
                 else:
                     self.type = 13
                     self.mass = 1.4
