@@ -114,18 +114,18 @@ Z_list: list = [
 # User configuration file: inlist.py
 
 # Initial mass function:
-# - 'Kroupa1993':
-# - 'Kroupa2002':                 increased proportion of stars above 1 M_sun compared to Kroupa1993
-# - 'Weisz2015':                  IMF for M31 galaxy
-IMF_scheme: str = 'Kroupa2002'
+# - 'kroupa1993':
+# - 'kroupa2002':                 increased proportion of stars above 1 M_sun compared to kroupa1993
+# - 'weisz2015':                  IMF for M31 galaxy
+IMF_scheme: str = 'kroupa2002'
 
 # Binary fraction
 #
 # Can be:
 #     - str: predefined model name
-#         - 'Haaften2013': Haaften et al. (2013) model  →  f_b = 0.5 + 0.25 * log10(M)
+#         - 'haaften2013': Haaften et al. (2013) model  →  f_b = 0.5 + 0.25 * log10(M)
 #     - float: directly specify binary fraction in range 0-1
-binary_fraction: str | float = 'Haaften2013'
+binary_fraction: str | float = 'haaften2013'
 
 # Galactic age [unit: Gyr]
 #
@@ -228,9 +228,9 @@ log10_P_range: tuple[float, float] = (0.15, 5.5)
 sep_range: tuple[float, float] = (3.0, 10000.0)
 
 # Initial orbit model:
-# - 'Sana2012':                   initial parameter space: primary mass + secondary mass + orbital period
-# - 'Hurley2002':                 initial parameter space: primary mass + secondary mass + orbital semi-major axis
-ini_orbit_scheme: str = 'Sana2012'
+# - 'hurley2002':                 initial parameter space: primary mass + secondary mass + orbital semi-major axis
+# - 'sana2012':                   initial parameter space: primary mass + secondary mass + orbital period
+ini_orbit_scheme: str = 'sana2012'
 
 # Initial eccentricity distribution model:
 # - 'zero':                       zero distribution, assumes initial circular orbit, no eccentricity
@@ -423,65 +423,129 @@ target_popbin: list = [
 ]
 
 # ------------------------------------------------------------------------------------------------------------------
-#                                              Common envelope parameters
+#                                                   Supernovae
 # ------------------------------------------------------------------------------------------------------------------
 # User configuration file: inlist.py
 
-# Binding energy parameter:
-# - 'WJL2016':                    λ from Wang et al. (2016) (doi: 10.1088/1674–4527/16/8/126)
-# - 'XL2010':                     λ from Nanjing group (Xu & Li 2010) (doi:10.1088/0004-637X/716/1/114)
-lambda_binding: str = 'XL2010'
+# Core-collapse supernova remnant prescription:
+# - 'fryer2012_rapid':              rapid model, Fryer et al. 2012 (doi:10.1088/0004-637X/749/1/91)
+# - 'fryer2012_delayed':            delayed model, Fryer et al. 2012
+# - 'mandel2020':                   stochastic model, Mandel et al. 2020 (doi:10.1093/mnras/staa3043)
+# - 'maltsev2025':                  metallicity- and mass-transfer-history-dependent model, Maltsev et al. 2025
+#
+# Notes:
+# - The Fryer-based prescriptions compute remnant masses and then classify NSs/BHs using the maximum NS mass
+#   adopted by the code.
+# - The Maltsev prescription contains complete-collapse BH, fallback BH, and NS branches that depend on metallicity
+#   and the first pre-SN mass-transfer history.
+ccsn_remnant_prescription: str = 'maltsev2025'
 
-# Fraction of internal energy available to eject the envelope
+# Fallback fraction for the fallback-BH branch in the 'maltsev2025' remnant prescription [range: 0-1].
 #
-# Formula: λ = α_th · λ_b + (1 - α_th) · λ_g
+# Formula:
+#     M_BH = M_proto_NS + (M_He - M_proto_NS) * f_fb
 #
-# Where:
-# - λ_b : binding energy parameter including internal energy contribution
-# - λ_g : binding energy parameter considering only gravitational energy
-#
-# Physical interpretation:
-# - α_th = 0 : no internal energy contribution (conservative estimate)
-# - α_th = 1 : all internal energy used to eject envelope (optimistic estimate)
-#
-# Reference: Xu & Li 2010, doi:10.1088/0004-637X/716/1/114
-alpha_th: float = 1.0
+# In the current prescription, M_proto_NS is typically taken as 1.4 M_sun.
+# This parameter is ignored unless ccsn_remnant_prescription == 'maltsev2025'.
+ccsn_remnant_maltsev_fallback: float = 0.5
 
-# Common envelope ejection efficiency
-alpha_CE: float = 1.0
+# Fallback-model choice for the successful-SN window in the 'maltsev2025' remnant prescription.
+# - 'A': NS-guaranteed windows plus 15% fallback-BH probability outside them.
+# - 'B': 10% fallback-BH probability throughout the intermediate region.
+#
+# Default: 'B' (matches the COMPAS implementation).
+ccsn_remnant_maltsev_fallback_model: str = 'B'
 
-# Whether HG stars can survive common envelope evolution
-HG_survive_CE: bool = True
+# Core-collapse supernova natal-kick prescription:
+# - 'zero':                         zero natal kick
+# - 'maxwellian':                   Maxwellian kick model
+# - 'lognormal':                    lognormal kick model
+# - 'mandel2020':                   remnant-dependent kick model from Mandel et al. 2020
+ccsn_kick_prescription: str = 'maxwellian'
+
+# Maxwellian natal-kick sigma for CCSNe [unit: km/s].
+#
+# Default: 217 km/s, following the corrected single-peak Maxwellian adopted by
+# Disberg & Mandel 2025 as a revision of the commonly used Hobbs et al. 2005 value.
+ccsn_kick_maxwellian_sigma: float = 217.0
+
+# Lognormal natal-kick parameters for CCSNe [unit: km/s].
+#
+# These correspond to the fiducial lognormal model of Disberg & Mandel 2025.
+ccsn_kick_lognormal_mu: float = 5.60
+ccsn_kick_lognormal_sigma: float = 0.68
+ccsn_kick_lognormal_vmax: float | None = 1000.0
+
+# Black-hole kick scaling applied when the remnant is a BH:
+# - 'full':                         no reduction, v_BH = v_k
+# - 'zero':                         direct-collapse limit, v_BH = 0
+# - 'fallback':                     fallback-scaled kick, v_BH = v_k * (1 - f_fb)
+#
+# Notes:
+# - This parameter only applies to BH remnants.
+# - It is ignored when ccsn_kick_prescription == 'mandel2020', because that prescription 
+#   already defines the BH kick behavior internally.
+ccsn_kick_bh_scaling: str = 'fallback'
+
+# Maxwellian natal-kick sigma for ECSNe [unit: km/s].
+ecsn_kick_maxwellian_sigma: float = 30.0
+
+# Maxwellian natal-kick sigma for neutron stars/black holes formed via AIC [unit: km/s].
+aic_kick_maxwellian_sigma: float = 30.0
 
 # ------------------------------------------------------------------------------------------------------------------
-#                                                      Supernovae
+#                                                     Wind parameters
 # ------------------------------------------------------------------------------------------------------------------
 # User configuration file: inlist.py
 
-# Supernova model:
-# - 'rapid':                          rapid model, Fryer et al. 2012 (doi:10.1088/0004-637X/749/1/91)
-# - 'delayed':                        delayed model, Fryer et al. 2012
-# - 'stochastic':                     stochastic model, Mandel et al. 2020 (doi:10.1093/mnras/staa3043)
-SNtype: str = 'rapid'
+# Wind mass loss model:
+# - 'hurley2000':
+# - 'belczynski2010':
+# - 'merritt2026':
+wind_model: str = 'merritt2026'
 
-# Core-collapse supernova natal-kick model:
-# - 'hobbs2005': Maxwellian model, Hobbs et al. 2005
-# - 'disberg2025': lognormal model, Disberg & Mandel 2025
-CCSN_kick_model: str = 'hobbs2005'
+# --------------------------------
+# Wind loss related constants
+# --------------------------------
 
-# Hobbs et al. 2005 Maxwellian kick parameter [unit: km/s]
-sigma_CCSN: float = 265.0
+# Reimers mass-loss coefficient
+reimers_eta: float = 0.5
 
-# Disberg & Mandel 2025 fiducial lognormal kick parameters.
-CCSN_kick_lognormal_mu: float = 5.60
-CCSN_kick_lognormal_sigma: float = 0.68
-CCSN_kick_lognormal_vmax: float | None = 1000.0
+# Tidal-enhancement factor for Reimers mass loss
+reimers_tidal_enhancement: float = 0.0
 
-# Kick velocity for neutron stars formed via ECSN
-sigma_ECSN: float = 30.0
+# Hamann-based WR mass-loss scaling factor, range 0-1
+f_WR_hamann: float = 1.0
 
-# Kick velocity for neutron stars/black holes formed via AIC
-sigma_AIC: float = 30.0
+# LBV mass-loss scaling factor for the Belczynski et al. (2010) prescription
+f_LBV_belczynski: float = 1.5
+
+# --------------------------------
+# Wind accretion related constants
+# --------------------------------
+
+# Bondi-Hoyle wind accretion factor (3/2)
+wind_bhl_factor: float = 1.5
+
+# Wind velocity factor: proportional to vwind**2 (1/8)
+wind_velocity_scale: float = 0.125
+
+# Transfer efficiency of specific angular momentum in wind accretion
+wind_angular_momentum_efficiency: float = 1.0
+
+# ------------------------------------------------------------------------------------------------------------------
+#                                                    Magnetic braking
+# ------------------------------------------------------------------------------------------------------------------
+# User configuration file: inlist.py
+
+# Magnetic-braking prescription
+# - 'rappaport1983':
+# - 'hurley2002':
+# - 'van2019':
+magnetic_braking_prescription: str = 'hurley2002'
+
+# Radius exponent in the Rappaport-style magnetic-braking law
+magnetic_braking_radius_exponent: float = 4.0
 
 # ------------------------------------------------------------------------------------------------------------------
 #                                                Mass transfer parameters
@@ -498,69 +562,47 @@ mass_accretion_model: str = 'rotation dependent'
 # - 'CE-wind':                       common envelope wind model, Cui et al. 2022 (doi.org/10.1051/0004-6361/202141335)
 # - 'CE':                            common envelope model
 # - 'OTW':                           optically thick wind model
-WD_crit_accretion: str = 'CE-wind'
+wd_supercritical_accretion_model: str = 'CE-wind'
 
 # Maximum WD mass for stable mass transfer to NS/BH [unit: M_sun]. Recommended range: 0.2 - 1.25
-M_wd_ns_crit: float = 1.25
+max_wd_mass_stable_mt_to_ns_bh: float = 1.25
 
-# Fraction of accreted material retained by WD after nova outburst
-epsnov: float = 0.001
+# Fraction of transferred material retained by a WD after nova outbursts
+wd_nova_retention_fraction: float = 0.001
 
-# Eddington limit factor for mass transfer
-eddfac: float = 1.0
-
-# ------------------------------------------------------------------------------------------------------------------
-#                                                     Wind parameters
-# ------------------------------------------------------------------------------------------------------------------
-# User configuration file: inlist.py
-
-# Wind mass loss model:
-# - 'Hurley':
-# - 'Belczynski':
-wind_model: str = 'Belczynski'
-
-# --------------------------------
-# Wind loss related constants
-# --------------------------------
-
-# Reimers mass loss coefficient
-neta: float = 0.5
-
-# Tidal enhancement parameter for Reimers mass loss
-bwind: float = 0.0
-
-# Helium star mass loss scaling factor, range 0-1
-f_WR: float = 0.5
-
-# LBV mass loss scaling factor
-f_LBV: float = 1.5
-
-# --------------------------------
-# Wind accretion related constants
-# --------------------------------
-
-# Bondi-Hoyle wind accretion factor (3/2)
-alpha_wind: float = 1.5
-
-# Wind velocity factor: proportional to vwind**2 (1/8)
-beta_wind: float = 0.125
-
-# Transfer efficiency of specific angular momentum in wind accretion
-mu_wind: float = 1.0
+# Multiplicative factor applied to the Eddington accretion limit during mass transfer
+mass_transfer_eddington_factor: float = 1.0
 
 # ------------------------------------------------------------------------------------------------------------------
-#                                                    Magnetic braking
+#                                              Common envelope parameters
 # ------------------------------------------------------------------------------------------------------------------
 # User configuration file: inlist.py
 
-# Magnetic braking model:
-# - 'Rappaport1983':
-# - 'Hurley2002':
-# - 'Van2019':
-mb_model: str = 'Hurley2002'
+# Common envelope ejection efficiency
+ce_alpha: float = 1.0
 
-# Magnetic braking power-law index
-gamma_mb: float = 4.0
+# Binding energy parameter:
+# - 'xl2010':                     λ from Nanjing group (Xu & Li 2010) (doi:10.1088/0004-637X/716/1/114)
+# - 'wjl2016':                    λ from Wang et al. (2016) (doi: 10.1088/1674–4527/16/8/126)
+ce_lambda_prescription: str = 'xl2010'
+
+# Fraction of internal energy available to eject the envelope
+#
+# Formula: λ = α_th · λ_b + (1 - α_th) · λ_g
+#
+# Where:
+# - λ_b : binding energy parameter including internal energy contribution
+# - λ_g : binding energy parameter considering only gravitational energy
+#
+# Physical interpretation:
+# - α_th = 0 : no internal energy contribution (conservative estimate)
+# - α_th = 1 : all internal energy used to eject envelope (optimistic estimate)
+#
+# Reference: Xu & Li 2010, doi:10.1088/0004-637X/716/1/114
+ce_internal_energy_fraction: float = 1.0
+
+# Whether HG stars can survive common envelope evolution
+ce_allow_hg_survival: bool = True
 
 # ------------------------------------------------------------------------------------------------------------------
 #                                                    Compact objects
@@ -574,9 +616,9 @@ M_ch: float = 1.44
 M_ECSN: float = 1.38
 
 # Maximum neutron star mass [unit: M_sun]
-M_ns_max: float = 2.5
+max_ns_mass: float = 2.5
 
 # White dwarf cooling model:
 # - True:                         use modified-Mestel cooling model
 # - False:                        use standard model
-WD_flag: bool = False
+wd_use_modified_mestel_cooling: bool = False

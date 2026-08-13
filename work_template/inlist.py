@@ -51,8 +51,21 @@ Z_list = [
 # ==================================================================================
 #                                      Supernova
 # ==================================================================================
-# Supernova model ('rapid', 'delayed', 'stochastic').
-SNtype = 'rapid'
+# Core-collapse supernova remnant prescription ('fryer2012_rapid', 'fryer2012_delayed', 'mandel2020', 'maltsev2025').
+ccsn_remnant_prescription = 'maltsev2025'
+
+# Fallback fraction used by the Maltsev remnant prescription.
+ccsn_remnant_maltsev_fallback = 0.5
+
+# Natal-kick prescription for CCSNe ('zero', 'maxwellian', 'lognormal', 'mandel2020').
+ccsn_kick_prescription = 'maxwellian'
+
+
+# ==================================================================================
+#                                      Stellar Wind
+# ==================================================================================
+# Wind mass loss model ('hurley2000', 'belczynski2010', 'merritt2026')
+wind_model: str = 'merritt2026'
 
 
 # ==================================================================================
@@ -67,11 +80,8 @@ mass_accretion_model = 'rotation dependent'
 # ==================================================================================
 
 # Common-envelope ejection efficiency.
-alpha_CE = 1.0
+ce_alpha = 1.0
 
-# Binding-energy parameter model ('XL2010', 'WJL2016').
-# lambda_binding: str = 'WJL2016'
-
-
-
+# Binding-energy parameter model ('xl2010', 'wjl2016').
+ce_lambda_prescription: str = 'xl2010'
 

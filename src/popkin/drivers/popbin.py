@@ -81,10 +81,10 @@ def put_output_data(filename, data):
 
 
 def create_binary(star1, star2, orbit_param, ecc, index):
-    if ini_orbit_scheme == "Sana2012":
+    if ini_orbit_scheme == "sana2012":
         return BinaryStar(star1=star1, star2=star2, period=orbit_param, ecc=ecc, index=index)
 
-    if ini_orbit_scheme == "Hurley2002":
+    if ini_orbit_scheme == "hurley2002":
         return BinaryStar(star1=star1, star2=star2, sep=orbit_param, ecc=ecc, index=index)
 
     raise ValueError(f"Unsupported orbit model: {ini_orbit_scheme}")
@@ -296,9 +296,9 @@ def popbin() -> None:
             "Documentation reference: /src/popkin/config/controls_default.py"
         )
 
-    if ini_orbit_scheme == "Sana2012":
+    if ini_orbit_scheme == "sana2012":
         orbit_param_range = (10 ** log10_P_range[0], 10 ** log10_P_range[1])
-    elif ini_orbit_scheme == "Hurley2002":
+    elif ini_orbit_scheme == "hurley2002":
         orbit_param_range = sep_range
     else:
         raise ValueError(f"Unsupported orbit model: {ini_orbit_scheme}")

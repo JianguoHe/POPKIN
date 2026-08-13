@@ -201,7 +201,8 @@ through local configuration files.
 - Galactic orbit integration and gravitational-wave SNR switches;
 - common-envelope, mass-transfer, stellar-wind, magnetic-braking, and
   supernova prescriptions;
-- natal-kick models, including the default Hobbs et al. Maxwellian model and an
+- natal-kick models, including a Maxwellian CCSN kick model with the
+  Disberg & Mandel 2025 correction to the Hobbs et al. scale parameter, and an
   optional Disberg & Mandel 2025 lognormal CCSN kick model.
 
 ### Program-Specific Configuration

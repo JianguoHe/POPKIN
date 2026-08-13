@@ -1,18 +1,22 @@
 import numpy as np
 from numba import float64, int64, types, from_dtype
-from popkin.metallicity.zcnst import zcnsts_set
 from popkin.utils import conditional_jitclass
+from popkin.metallicity.zcnst import zcnsts_set
 from popkin.binding_energy import z002, z0001, z00001, lambda_XL2010
 from popkin.constants import ahe, aco, tiny
 from popkin.constants import period_to_sep, struct_dtype_single
 from popkin.constants import sec_per_year, Z_sun, R_sun, T_eff_sun
-from popkin.config.controls_default import max_time, max_step, ini_spin_scheme, lambda_binding, alpha_th
 from popkin.config.controls_default import (
-    SNtype, CCSN_kick_model, sigma_CCSN, CCSN_kick_lognormal_mu, CCSN_kick_lognormal_sigma,
-    CCSN_kick_lognormal_vmax, sigma_ECSN, sigma_AIC, M_ECSN, M_ch, M_ns_max, WD_flag, 
-    compact_star_max_timestep,
+    max_time, max_step, ini_spin_scheme, compact_star_max_timestep,
+    ccsn_remnant_prescription, ccsn_remnant_maltsev_fallback, ccsn_remnant_maltsev_fallback_model,
+    ccsn_kick_prescription, ccsn_kick_maxwellian_sigma, ccsn_kick_bh_scaling,
+    ccsn_kick_lognormal_mu, ccsn_kick_lognormal_sigma, ccsn_kick_lognormal_vmax, 
+    ecsn_kick_maxwellian_sigma, aic_kick_maxwellian_sigma,
+    M_ECSN, M_ch, max_ns_mass, wd_use_modified_mestel_cooling,
+    ce_lambda_prescription, ce_internal_energy_fraction,
+    magnetic_braking_prescription, magnetic_braking_radius_exponent, 
+    wind_model, reimers_eta, reimers_tidal_enhancement, f_WR_hamann, f_LBV_belczynski,
 )
-from popkin.config.controls_default import mb_model, gamma_mb, wind_model, neta, bwind, f_WR, f_LBV
 from popkin.config.user_config import apply_user_config
 
 apply_user_config(globals(), "inlist")
@@ -61,8 +65,8 @@ spec = [
     ('lums', float64[:]),                   # characteristic luminosities
     ('GB', float64[:]),                     # giant branch parameters
     ('f_fb', float64),                      # fraction of fallback material after supernova explosion
-    ('meanvk', float64),                    # mean of the natal kick velocity distribution under the stochastic model
-    ('sigmavk', float64),                   # standard deviation of natal kick velocity distribution in the stochastic SN model
+    ('kick_mean', float64),                 # mean kick speed for the Mandel et al. (2020) prescription [unit: km/s]
+    ('kick_sigma', float64),                # standard deviation of the kick-speed distribution [unit: km/s]
     ('rg', float64),                        # giant branch or Hayashi track radius, approporaite for the type.
     ('k3', float64),                        # spin angular momentum of core is jspin_core=k3*omega*mc*rc**2
     ('k2', float64),                        # spin angular momentum of envelope is jspin_envelop=k2*omega*me*re**2
@@ -71,6 +75,7 @@ spec = [
     ('lambda_bind', float64),               # binding energy parameter for common envelope evolution
     ('event', types.string),                # event that occurs during the evolution of the star, including AIC, ECSN, CCSN, Ia, or None
     ('v_kick', float64[:]),                 # kick velocity imparted by the supernova explosion
+    ('first_mt_case', int64),               # mass-transfer case of the first episode in which this star acts as the donor
     ('index', int64),                       # stellar index, used as random seed
 ]
 
@@ -119,8 +124,8 @@ class SingleStar:
         self.lums = np.zeros(10)
         self.GB = np.zeros(20)
         self.f_fb = 0.
-        self.meanvk = 0.
-        self.sigmavk = 0.
+        self.kick_mean = 0.
+        self.kick_sigma = 0.
         self.rg = 0.
         self.k3 = 0.21
         self.k2 = 0.21
@@ -129,6 +134,7 @@ class SingleStar:
         self.lambda_bind = 0.5
         self.event = 'None'
         self.v_kick = np.full(3, np.nan)
+        self.first_mt_case = 0
         self.index = index
         zcnsts_set(self)                    # set metallicity-related constants
         self._set_spin()                    # set initial spin
@@ -425,18 +431,24 @@ class SingleStar:
     # ------------------------------------------------------------------------------------------------------------------
     #                                                   magnetic braking
     # ------------------------------------------------------------------------------------------------------------------
+    def cal_jdot_mb_rappaport1983(self):
+        return (
+            -3.8e-30 * self.mass * self.R ** magnetic_braking_radius_exponent
+            * self.spin ** 3 * R_sun ** 2 / sec_per_year
+        )
+
     def magnetic_braking(self):
         # Calculate spin angular momentum loss due to magnetic braking for stars with a convective envelope: 
         # main-sequence stars (M < 1.25), HG stars near the giant branch, and giants. 
         # Fully convective main-sequence stars are excluded.
         # 计算有明显对流包层的恒星因磁制动损失的自旋角动量, 包括主序星(M < 1.25)、靠近巨星分支的HG恒星以及巨星, 不包括完全对流主序星
         if (0.35 < self.mass < 1.25 and self.type <= 1) or 2 <= self.type <= 9:
-            if mb_model == 'Rappaport1983':
-                self.jdot_mb = -3.8e-30 * self.mass * self.R ** gamma_mb * self.spin ** 3 * R_sun ** 2 / sec_per_year
-            elif mb_model == 'Hurley2002':
+            if magnetic_braking_prescription == 'rappaport1983':
+                self.jdot_mb = self.cal_jdot_mb_rappaport1983()
+            elif magnetic_braking_prescription == 'hurley2002':
                 self.jdot_mb = -5.83e-16 * self.M_conv_env * (self.R * self.spin) ** 3 / self.mass
-            elif mb_model == 'Van2019':
-                djmb_Sk = -3.8e-30 * self.mass * self.R ** gamma_mb * self.spin ** 3 * R_sun ** 2 / sec_per_year
+            elif magnetic_braking_prescription == 'van2019':
+                djmb_Sk = self.cal_jdot_mb_rappaport1983()
                 R_conv_env_true = max(1e-10, min(self.R_conv_env, self.R - self.R_core))
                 tau_conv = 0.4311 * (
                             self.M_conv_env * R_conv_env_true * (self.R - 0.5 * R_conv_env_true) / (3 * self.L)) ** (
@@ -445,7 +457,7 @@ class SingleStar:
                 self.jdot_mb = djmb_Sk * (tau_conv / tau_conv_sun) ** 2
             else:
                 raise ValueError(
-                    "Unsupported mb_model. Expected one of: 'Rappaport1983', 'Hurley2002', 'Van2019'."
+                    "Unsupported magnetic_braking_prescription. Expected one of: 'rappaport1983', 'hurley2002', 'van2019'."
                 )
         else:
             self.jdot_mb = 0
@@ -486,19 +498,24 @@ class SingleStar:
     # ------------------------------------------------------------------------------------------------------------------
     # Calculate the total stellar wind mass loss.
     def cal_mdot_wind(self, ecc=0):
-        if wind_model == 'Hurley':
-            self.cal_mdot_wind_Hurley(ecc)
-        elif wind_model == 'Belczynski':
-            self.cal_mdot_wind_Belczynski(ecc)
+        if wind_model == 'hurley2000':
+            self.cal_mdot_wind_hurley2000(ecc)
+        elif wind_model == 'belczynski2010':
+            self.cal_mdot_wind_belczynski2010(ecc)
+        elif wind_model == 'merritt2026':
+            self.cal_mdot_wind_merritt2026(ecc)
         else:
-            raise ValueError("Unsupported wind_model. Expected one of: 'Hurley', 'Belczynski'.")
+            raise ValueError(
+                "Unsupported wind_model. Expected one of: "
+                "'hurley2000', 'belczynski2010', 'merritt2026'."
+            )
 
-    # Calculate the total stellar wind mass loss (Hurley model).
-    def cal_mdot_wind_Hurley(self, ecc):
+    # Calculate the total stellar wind mass loss (Hurley2000 model).
+    def cal_mdot_wind_hurley2000(self, ecc):
         mdot_NJ = self.cal_mdot_NJ()
         mdot_KR = self.cal_mdot_KR(ecc=ecc)
         mdot_VW = self.cal_mdot_VW()
-        mdot_WR = self.cal_mdot_WR()
+        mdot_WR = self.cal_mdot_WR_hurley2000()
         mdot_LBV_Hurley = self.cal_mdot_LBV_Hurley()
 
         if 0 <= self.type <= 6:
@@ -509,25 +526,65 @@ class SingleStar:
             mdot_wind = 0
         self.mdot_wind_loss = -mdot_wind
 
-    # Calculate the total stellar wind mass loss (Belczynski model).
-    def cal_mdot_wind_Belczynski(self, ecc):
-        mdot_OB = self.cal_mdot_OB()
-        mdot_KR = self.cal_mdot_KR(ecc=ecc)
-        mdot_WR = self.cal_mdot_WR(z_dependent=True)
-        mdot_LBV_Belczynski = self.cal_mdot_LBV_Belczynski()
-
-        # LBV star
-        if mdot_LBV_Belczynski > 0:
-            self.mdot_wind_loss = -mdot_LBV_Belczynski
+    # Calculate the total stellar wind mass loss (Belczynski2010 model).
+    def cal_mdot_wind_belczynski2010(self, ecc):
         # Helium star
-        elif 7 <= self.type <= 9:
-            self.mdot_wind_loss = -max(mdot_KR, mdot_WR)
-        # OB star
-        elif mdot_OB > 0:
-            self.mdot_wind_loss = -mdot_OB
-        # Other cases
+        if 7 <= self.type <= 9:
+            self.mdot_wind_loss = - self.cal_mdot_WR_belczynski2010()
+        # LBV star
+        elif self.is_lbv_like():
+            self.mdot_wind_loss = - self.cal_mdot_LBV_Belczynski()
         else:
-            self.cal_mdot_wind_Hurley(ecc=ecc)
+            mdot_OB = self.cal_mdot_OB_vink2001()
+            # OB star
+            if mdot_OB > 0:
+                self.mdot_wind_loss = -mdot_OB
+            # Other cases
+            else:
+                self.cal_mdot_wind_hurley2000(ecc=ecc)
+
+    # Calculate the total stellar wind mass loss using the phase-based Merritt2026 dispatcher.
+    def cal_mdot_wind_merritt2026(self, ecc):
+        regime = self.classify_wind_regime_merritt2026()
+        mdot_phase = self.cal_mdot_phase_merritt2026(regime=regime, ecc=ecc)
+        mdot_lbv = self.cal_mdot_LBV_Hurley() if self.is_lbv_like() else 0.0
+        self.mdot_wind_loss = -(mdot_phase + mdot_lbv)
+
+    # Classify the dominant stellar-wind regime used by the Merritt2026 branch.
+    def classify_wind_regime_merritt2026(self):
+        if 7 <= self.type <= 9:
+            return 'WR_STRIPPED'
+        if 0 <= self.type <= 6 and self.mass >= 100.0:
+            return 'VMS'
+        if 0 <= self.type <= 6 and self.mass < 100.0 and self.Teff >= 8.0e3:
+            return 'OB'        
+        if 2 <= self.type <= 6 and self.mass0 >= 8.0 and self.Teff < 8.0e3:
+            return 'RSG'
+        return 'OTHER'
+
+    # Dispatch the phase-specific wind prescription used by the Merritt2026 branch.
+    def cal_mdot_phase_merritt2026(self, regime, ecc):
+        if regime == 'WR_STRIPPED':
+            return self.cal_mdot_WR_Merritt2026()
+        if regime == 'RSG':
+            return self.cal_mdot_RSG_Decin2024()
+        if regime == 'VMS':
+            return self.cal_mdot_VMS_Sabhahit2023()
+        if regime == 'OB':
+            return self.cal_mdot_OB_vink_sander2021()
+
+        if 0 <= self.type <= 6:
+            return max(self.cal_mdot_NJ(), self.cal_mdot_KR(ecc=ecc), self.cal_mdot_VW(), self.cal_mdot_WR_hurley2000())
+        if 7 <= self.type <= 9:
+            return max(self.cal_mdot_NJ(), self.cal_mdot_KR(ecc=ecc), self.cal_mdot_WR_hurley2000())
+        return 0.0
+
+    # Return whether the star satisfies the Humphreys-Davidson LBV criterion.
+    def is_lbv_like(self):
+        if not (0 <= self.type <= 6):
+            return False
+        HD = 1e-5 * self.R * self.L ** 0.5
+        return self.L > 6e5 and HD > 1.0
 
     # -------------------------------------------------------------------------------------------------------------------
     #                                      Various stellar wind mass loss rates (M_sun/yr)
@@ -543,33 +600,18 @@ class SingleStar:
             mdot_NJ = 0
         return mdot_NJ
 
-    # Calculate mass loss rate for massive OB stars using the Vink et al. 2001 prescription
-    # Vink et al. 2001, eqs 24 & 25; Belczynski et al. 2010, eqs 6 & 7
-    def cal_mdot_OB(self):
-        if self.type <= 6 and 1.25e4 < self.Teff <= 2.5e4:
-            term1 = - 6.688 + 2.21 * np.log10(self.L / 1.0e5)
-            term2 = - 1.339 * np.log10(self.mass / 30) - 1.601 * np.log10(1.3 / 2)
-            term3 = 1.07 * np.log10(self.Teff / 2e4) + 0.85 * np.log10(self.Z / Z_sun)
-            mdot_OB = 10 ** (term1 + term2 + term3)
-        elif self.type <= 6 and 2.5e4 < self.Teff <= 5.0e4:
-            term1 = - 6.697 + 2.194 * np.log10(self.L / 1.0e5) - 1.313 * np.log10(self.mass / 30.0)
-            term2 = - 1.226 * np.log10(2.6 / 2.0) + 0.933 * np.log10(self.Teff / 4.0e4)
-            term3 = - 10.92 * np.log10(self.Teff / 4.0e4) ** 2 + 0.85 * np.log10(self.Z / Z_sun)
-            mdot_OB = 10 ** (term1 + term2 + term3)
-        else:
-            mdot_OB = 0
-        return mdot_OB
-
     # calculate mass loss rate on the GB and beyond
     # Hurley et al. 2000, eq 106 (based on a prescription taken from Kudritzki & Reimers, 1978, A&A, 70, 227)
     def cal_mdot_KR(self, ecc):
         if 2 <= self.type <= 9:
-            mdot_KR = neta * 4e-13 * self.R * self.L / self.mass
+            mdot_KR = reimers_eta * 4e-13 * self.R * self.L / self.mass
             # Apply tidal enhancement of mdot_KR (if applicable; eccentric orbit may also need to be considered).
             # 考虑 mdot_KR 受潮汐增强(如果应用, 这里可能还需要考虑偏心轨道的情况)
             if self.R_rl > 0.0 and 0 <= ecc < 1:
                 rochelobe_periastron = self.R_rl * (1.0 - ecc)
-                mdot_KR = mdot_KR * (1.0 + bwind * (min(0.5, (self.R / rochelobe_periastron))) ** 6)
+                mdot_KR = mdot_KR * (
+                    1.0 + reimers_tidal_enhancement * (min(0.5, (self.R / rochelobe_periastron))) ** 6
+                )
         else:
             mdot_KR = 0
         return mdot_KR
@@ -585,27 +627,259 @@ class SingleStar:
             mdot_VW = 0
         return mdot_VW
 
-    # calculate mass loss of Wolf–Rayet or Wolf–Rayet like star with small H-envelope mass
-    # Hurley et al. 2000, just after eq 106 (taken from Hamann, Koesterke & Wessolowski 1995, Hamann & Koesterke 1998)
-    # Belczynski et al. 2010, eq 9 when z_dependent is True
-    def cal_mdot_WR(self, z_dependent=False):
-        mdot_WR = f_WR * 1e-13 * self.L ** 1.5
+    # Calculate the base WR mass-loss scaling from Hamann et al. (1995, 1998).
+    def cal_mdot_WR_hamann1995(self):
+        return f_WR_hamann * 1e-13 * self.L ** 1.5
+
+    # Calculate the Hurley et al. (2000) WR-like wind.
+    # This applies the Hamann-based scaling to helium stars and further suppresses it
+    # for hydrogen-rich stars with non-negligible envelopes.
+    def cal_mdot_WR_hurley2000(self):
+        mdot_WR = self.cal_mdot_WR_hamann1995()
         if 0 <= self.type <= 6:
             lum0 = 7e4
             kap = -0.5
             mu = (self.mass - self.M_core) / self.mass * min(5.0, max(1.2, (self.L / lum0) ** kap))
-            mdot_WR = mdot_WR * (1 - mu) if mu < 1.0 else 0
+            mdot_WR = mdot_WR * (1 - mu) if mu < 1.0 else 0.0
         elif 7 <= self.type <= 9:
-            mdot_WR = mdot_WR * (self.Z / Z_sun) ** 0.86 if z_dependent else mdot_WR
-        else:
-            mdot_WR = 0
+            pass
+        elif self.type > 9:
+            mdot_WR = 0.0
         return mdot_WR
+
+    # Calculate the Belczynski et al. (2010) metallicity-dependent WR wind.
+    def cal_mdot_WR_belczynski2010(self):
+        return self.cal_mdot_WR_hamann1995() * (self.Z / Z_sun) ** 0.86
+
+    # Calculate mass loss rate for massive OB stars using the Vink et al. (2001) prescription.
+    # Vink et al. 2001, eqs. 24 and 25; Belczynski et al. 2010, eqs. 6 and 7.
+    def cal_mdot_OB_vink2001(self):
+        if self.type <= 6 and 1.25e4 < self.Teff <= 2.5e4:
+            term1 = - 6.688 + 2.21 * np.log10(self.L / 1.0e5)
+            term2 = - 1.339 * np.log10(self.mass / 30) - 1.601 * np.log10(1.3 / 2)
+            term3 = 1.07 * np.log10(self.Teff / 2e4) + 0.85 * np.log10(self.Z / Z_sun)
+            mdot_OB = 10 ** (term1 + term2 + term3)
+        elif self.type <= 6 and 2.5e4 < self.Teff <= 5.0e4:
+            term1 = - 6.697 + 2.194 * np.log10(self.L / 1.0e5) - 1.313 * np.log10(self.mass / 30.0)
+            term2 = - 1.226 * np.log10(2.6 / 2.0) + 0.933 * np.log10(self.Teff / 4.0e4)
+            term3 = - 10.92 * np.log10(self.Teff / 4.0e4) ** 2 + 0.85 * np.log10(self.Z / Z_sun)
+            mdot_OB = 10 ** (term1 + term2 + term3)
+        else:
+            mdot_OB = 0
+        return mdot_OB
+
+    def cal_mdot_OB_vink_sander2021(self):
+        """Return the OB-star mass-loss rate using the COMPAS Vink+Sander update.
+
+        This function does not evaluate a single closed-form prescription.
+        Instead, it follows the COMPAS implementation of the ``VINK2021``
+        option, which combines:
+
+        - the original Vink et al. (2001) three-branch OB-wind formulae,
+        - with temperature boundaries updated through the Vink & Sander
+          (2021) bi-stability-jump treatment.
+
+        In this rapid-population-synthesis form, the two jump temperatures
+        ``T1`` and ``T2`` are not taken from a direct lookup table. They are
+        approximated by the analytic fits used in COMPAS:
+
+            charrho = -14.94 + 3.1857 * Gamma_e + 0.42 * log10(Z / Z_sun)
+            T2      = (61.2 + 2.59 * charrho) * 1000 K
+            T1      = (100.0 + 6.0 * charrho) * 1000 K
+
+        Here ``T1`` is the cooler Fe III/II jump, while ``T2`` is the hotter
+        bi-stability jump, so the physically expected ordering is ``T1 < T2``.
+
+        The resulting wind is then evaluated in three temperature regimes:
+
+        1. ``8000 K <= Teff <= T1``:
+           cool-branch Vink-type wind, using ``v_inf / v_esc = 0.7`` and the
+           original ``Z^0.85`` metallicity scaling.
+        2. ``T1 < Teff <= T2``:
+           intermediate branch, using ``v_inf / v_esc = 1.3`` and the same
+           ``Z^0.85`` dependence.
+        3. ``Teff > T2``:
+           hot branch, using ``v_inf / v_esc = 2.6`` and the shallower
+           ``Z^0.42`` dependence adopted in the Vink+Sander update.
+
+        Stars outside the H-rich stellar range handled here return zero.
+        """
+        if self.type > 6 or self.Z <= 0.0:
+            return 0.0
+
+        # Metallicty exponents for the hot and cool/intermediate branches.
+        z_exponent_hot = 0.42
+        z_exponent_cool = 0.85
+
+        # COMPAS analytic fit for the two temperature jumps:
+        # t1 = cooler Fe III/II jump, t2 = hotter bi-stability jump.
+        gamma = self.cal_gamma_e_electron_scattering()
+        log_metallicity = np.log10(self.Z / Z_sun)
+        charrho = -14.94 + 3.1857 * gamma + z_exponent_hot * log_metallicity
+        t2 = (61.2 + 2.59 * charrho) * 1000.0
+        t1 = (100.0 + 6.0 * charrho) * 1000.0
+
+        # Cool branch below the first jump.
+        if 8.0e3 <= self.Teff <= t1:
+            v_ratio = 0.7
+            log_mdot = (
+                -5.99
+                + 2.21 * np.log10(self.L / 1.0e5)
+                - 1.339 * np.log10(self.mass / 30.0)
+                - 1.601 * np.log10(v_ratio / 2.0)
+                + 1.07 * np.log10(self.Teff / 2.0e4)
+                + z_exponent_cool * log_metallicity
+            )
+            mdot_OB = 10.0 ** log_mdot
+        # Intermediate branch between the two jumps.
+        elif t1 < self.Teff <= t2:
+            v_ratio = 1.3
+            log_mdot = (
+                -6.688
+                + 2.21 * np.log10(self.L / 1.0e5)
+                - 1.339 * np.log10(self.mass / 30.0)
+                - 1.601 * np.log10(v_ratio / 2.0)
+                + 1.07 * np.log10(self.Teff / 2.0e4)
+                + z_exponent_cool * log_metallicity
+            )
+            mdot_OB = 10.0 ** log_mdot
+        # Hot branch above the second jump.
+        elif self.Teff > t2:
+            v_ratio = 2.6
+            log_mdot = (
+                -6.697
+                + 2.194 * np.log10(self.L / 1.0e5)
+                - 1.313 * np.log10(self.mass / 30.0)
+                - 1.226 * np.log10(v_ratio / 2.0)
+                + 0.933 * np.log10(self.Teff / 4.0e4)
+                - 10.92 * np.log10(self.Teff / 4.0e4) ** 2
+                + z_exponent_hot * log_metallicity
+            )
+            mdot_OB = 10.0 ** log_mdot
+        else:
+            mdot_OB = 0.0
+        return mdot_OB
+
+    def cal_mdot_RSG_Decin2024(self):
+        """Return the CO-based RSG mass-loss rate from Decin et al. (2024).
+
+        Merritt et al. (2026) adopt the CO calibration as their default RSG
+        prescription. The fitted relation is
+
+            log10(Mdot / [10^-5 M_sun yr^-1]) = (R_SED + DeltaR)
+                                              + S * (M_init / 10 M_sun)
+                                              + b * log10(L / 10^5 L_sun),
+
+        with best-fit values ``R_SED = 1.77``, ``DeltaR = 0.49``,
+        ``S = -1.68``, and ``b = 3.50``. Regime selection is handled
+        upstream by ``classify_wind_regime_merritt2026()``.
+        """
+        r_sed = 1.77
+        delta_r = 0.49
+        s = -1.68
+        b = 3.50
+        log_mdot = -5.0 + (r_sed + delta_r) + s * (self.mass0 / 10.0) + b * np.log10(self.L / 1.0e5)
+        return 10.0 ** log_mdot
+
+    def cal_mdot_VMS_Sabhahit2023(self):
+        """Return the VMS mass-loss rate from Sabhahit et al. (2023).
+
+        This helper implements the very-massive-star prescription adopted by
+        Merritt et al. (2026) for the VMS regime. Following the COMPAS
+        implementation, the switch point is expressed through power-law fits
+        to Table 2 of Sabhahit et al. (2023):
+
+            M_switch      = 0.0615 * Z^-1.574 + 18.10
+            log10(L_switch / L_sun) = 2.36 - 1.91 * log10(Z)
+            log10(Mdot_switch / [M_sun yr^-1]) = -8.90 - 1.86 * log10(Z)
+
+        The Eddington-factor threshold is then
+
+            Gamma_switch = 2.49e-5 * L_switch / M_switch .
+
+        If the current star satisfies ``Gamma_e > Gamma_switch``, the VMS mass
+        loss is evaluated as
+
+            Mdot = Mdot_switch * (L / L_switch)^4.77 * (M / M_switch)^-3.99 .
+
+        Otherwise the star falls back to the default OB prescription
+        ``cal_mdot_OB_vink_sander2021()``, matching the Merritt/COMPAS
+        treatment.
+        """
+        l_switch = 10.0 ** 2.36 * self.Z ** (-1.91)
+        m_switch = 0.0615 * self.Z ** (-1.574) + 18.10
+        gamma_switch = 2.49e-5 * l_switch / m_switch
+        gamma_e = self.cal_gamma_e_electron_scattering()
+
+        if gamma_e <= gamma_switch:
+            return self.cal_mdot_OB_vink_sander2021()
+
+        mdot_switch = 10.0 ** (-1.86 * np.log10(self.Z) - 8.90)
+        mdot_vms = mdot_switch * (self.L / l_switch) ** 4.77 * (self.mass / m_switch) ** (-3.99)
+        return mdot_vms
+
+    # Calculate the Merritt2026 WR/stripped-helium wind.
+    def cal_mdot_WR_Merritt2026(self):
+        mdot_vink2017 = self.cal_mdot_WR_Vink2017()
+        mdot_sander_vink2020 = self.cal_mdot_WR_SanderVink2020()
+        return max(mdot_vink2017, mdot_sander_vink2020)
+
+    # Calculate the low-luminosity stripped-helium wind.
+    # Vink (2017), equation 1.
+    def cal_mdot_WR_Vink2017(self):
+        if not 7 <= self.type <= 9 or self.L <= 0.0 or self.Z <= 0.0:
+            return 0.0
+
+        log_luminosity = np.log10(self.L)
+        log_metallicity = np.log10(self.Z / Z_sun)
+        log_mdot = -13.3 + 1.36 * log_luminosity + 0.61 * log_metallicity
+        return 10.0 ** log_mdot
+
+    # Calculate the optically thick WR wind.
+    # This follows the luminosity-based Sander & Vink (2020) fit used in COMPAS,
+    # with the high-temperature correction from Sander et al. (2023).
+    def cal_mdot_WR_SanderVink2020(self):
+        if not 7 <= self.type <= 9 or self.L <= 0.0 or self.Z <= 0.0:
+            return 0.0
+
+        log_luminosity = np.log10(self.L)
+        log_metallicity = np.log10(self.Z / Z_sun)
+
+        # Sander & Vink (2020), eqs. 18-20: metallicity-dependent fit parameters.
+        alpha = 0.32 * log_metallicity + 1.4
+        log_luminosity_break = -0.87 * log_metallicity + 5.06
+        log_mdot_one_dex_above_break = -0.75 * log_metallicity - 4.06
+
+        # No optically thick WR wind is applied below the luminosity cutoff.
+        if log_luminosity < log_luminosity_break:
+            return 0.0
+
+        # Sander & Vink (2020), eq. 13.
+        log_mdot = (
+            alpha * np.log10(log_luminosity - log_luminosity_break)
+            + 0.75 * (log_luminosity - log_luminosity_break - 1.0)
+            + log_mdot_one_dex_above_break
+        )
+
+        # Sander et al. (2023) correction for Teff > 1e5 K.
+        if self.Teff > 1.0e5:
+            teff_ref = 1.41e5
+            log_mdot -= 6.0 * np.log10(self.Teff / teff_ref)
+        return 10.0 ** log_mdot
+
+    # Estimate the electron-scattering Eddington factor using a fixed-opacity approximation.
+    # This helper returns Gamma_e ~ 2.49e-5 * (L / M), following the current COMPAS-style
+    # implementation used by the OB, VMS, and WR wind prescriptions in this module.
+    def cal_gamma_e_electron_scattering(self):
+        if self.mass <= 0.0 or self.L <= 0.0:
+            return 0.0
+        return 2.49e-5 * self.L / self.mass
 
     # Calculate LBV-like mass loss rate for stars beyond the Humphreys-Davidson limit (Humphreys & Davidson 1994)
     # Hurley+ 2000 Section 7.1 a few equation after Eq. 106 (Equation not labelled)
     def cal_mdot_LBV_Hurley(self):
-        HD = 1e-5 * self.R * self.L ** 0.5
-        if self.L > 6e5 and HD > 1:
+        if self.is_lbv_like():
+            HD = 1e-5 * self.R * self.L ** 0.5
             mdot_LBV_Hurley = 0.1 * (HD - 1) ** 3 * (self.L / 6e5 - 1)
         else:
             mdot_LBV_Hurley = 0
@@ -614,12 +888,7 @@ class SingleStar:
     # Calculate LBV-like mass loss rate for stars beyond the Humphreys-Davidson limit (Humphreys & Davidson 1994)
     # Belczynski et al. 2010, eq 8
     def cal_mdot_LBV_Belczynski(self):
-        HD = 1e-5 * self.R * self.L ** 0.5
-        if self.L > 6e5 and HD > 1.0:
-            mdot_LBV_Belczynski = f_LBV * 1e-4
-        else:
-            mdot_LBV_Belczynski = 0
-        return mdot_LBV_Belczynski
+        return f_LBV_belczynski * 1e-4
 
     # ------------------------------------------------------------------------------------------------------------------
     #                                     Determine the timestep for stellar evolution
@@ -679,22 +948,35 @@ class SingleStar:
     def SN_remnant(self, mcbagb):
         self.event = 'CCSN'
 
-        # Current core mass, usually the pre-SN CO core mass.
-        # The variable mcbagb is the helium-core mass at the BGB phase (including the He+CO core)
-        # or the current mass of a helium star; it is used only by the stochastic model.
-        # 当前的核质量, 通常为SN爆发前的CO核质量
-        # 变量 mcbagb 表示bagb时的氦核质量(包括He+CO核)或氦星的当前质量, 仅用于stochastic模型的计算
+        # Here self.M_core is treated as the pre-SN CO-core mass.
+        # The argument mcbagb supplies the corresponding helium-core mass, either at BAGB
+        # or for the stripped helium star that is about to collapse.
 
-        if SNtype == 'rapid':  # rapid SN, origin from Fryer et al. 2012, ApJ, 749, 91
-            self.SN_remnant_rapid()
-        elif SNtype == 'delayed':  # delayed SN, origin from Fryer et al. 2012, ApJ, 749, 91
-            self.SN_remnant_delayed()
-        elif SNtype == 'stochastic':  # stochastic SN, origin from Mandel et al. 2020, MNRAS 499, 3214–3221
-            self.SN_remnant_stochastic(mcbagb)
+        if ccsn_remnant_prescription == 'fryer2012_rapid':         # Fryer et al. 2012 (doi:10.1088/0004-637X/749/1/91)
+            self.SN_remnant_fryer2012_rapid()
+        elif ccsn_remnant_prescription == 'fryer2012_delayed':     # Fryer et al. 2012 (doi:10.1088/0004-637X/749/1/91)
+            self.SN_remnant_fryer2012_delayed()
+        elif ccsn_remnant_prescription == 'mandel2020':            # Mandel et al. 2020 (doi:10.1093/mnras/staa3043)
+            self.SN_remnant_mandel2020(mcbagb)
+        elif ccsn_remnant_prescription == 'maltsev2025':           # Maltsev et al. 2025 (doi.org/10.1051/0004-6361/202554931)
+            self.SN_remnant_maltsev2025(mcbagb)
         else:
-            raise ValueError("Unsupported SNtype. Expected one of: 'rapid', 'delayed', 'stochastic'.")
+            raise ValueError(
+                "Unsupported ccsn_remnant_prescription. Expected one of: 'fryer2012_rapid', 'fryer2012_delayed', 'mandel2020', 'maltsev2025'."
+            )
 
-    def SN_remnant_rapid(self):
+        # Precompute the Mandel et al. (2020) kick-magnitude parameters from the final remnant mass.
+        # These values are only used when ccsn_kick_prescription == 'mandel2020'.
+        if self.type == 13:
+            self.kick_mean = 520.0 * (self.M_core - self.mass) / self.mass
+            self.kick_sigma = 0.3 * self.kick_mean
+        elif self.type == 14:
+            self.kick_mean = 200.0 * max((self.M_core - self.mass) / self.mass, 0.)
+            self.kick_sigma = 0.3 * self.kick_mean
+        else:
+            raise ValueError("Please check the remnant type after the supernova explosion.")
+
+    def SN_remnant_fryer2012_rapid(self):
         mproto = 1.0
         if self.M_core < 2.5:
             mfb = 0.2
@@ -709,11 +991,11 @@ class SingleStar:
         else:
             mfb = self.mass - mproto
         self.f_fb = mfb / (self.mass - mproto)
-        mrem_bar = mfb + mproto                                     # baryonic remnant mass / 遗迹重子质量
-        mrem1 = -6.6667 + 0.6667 * (100 + 30 * mrem_bar) ** 0.5     # NS gravitational mass / 中子星引力质量
-        mrem2 = 0.9 * mrem_bar                                      # BH gravitational mass / 黑洞引力质量
+        mrem_bar = mfb + mproto                                     # Baryonic remnant mass.
+        mrem1 = -6.6667 + 0.6667 * (100 + 30 * mrem_bar) ** 0.5     # NS gravitational mass.
+        mrem2 = 0.9 * mrem_bar                                      # BH gravitational mass.
         # Neutron star.
-        if mrem1 <= M_ns_max:
+        if mrem1 <= max_ns_mass:
             self.type = 13
             self.mass = mrem1
         # Black hole.
@@ -721,7 +1003,7 @@ class SingleStar:
             self.type = 14
             self.mass = mrem2
 
-    def SN_remnant_delayed(self):
+    def SN_remnant_fryer2012_delayed(self):
         if self.M_core <= 3.5:
             mproto = 1.2
         elif 3.5 < self.M_core <= 6.0:
@@ -741,11 +1023,11 @@ class SingleStar:
         else:
             mfb = self.mass - mproto
         self.f_fb = mfb / (self.mass - mproto)
-        mrem_bar = mfb + mproto                                     # baryonic remnant mass / 遗迹重子质量
-        mrem1 = -6.6667 + 0.6667 * (100 + 30 * mrem_bar) ** 0.5     # NS gravitational mass / 中子星引力质量
-        mrem2 = 0.9 * mrem_bar                                      # BH gravitational mass / 黑洞引力质量
+        mrem_bar = mfb + mproto                                     # Baryonic remnant mass.
+        mrem1 = -6.6667 + 0.6667 * (100 + 30 * mrem_bar) ** 0.5     # NS gravitational mass.
+        mrem2 = 0.9 * mrem_bar                                      # BH gravitational mass.
         # Neutron star.
-        if mrem1 <= M_ns_max:
+        if mrem1 <= max_ns_mass:
             self.type = 13
             self.mass = mrem1
         # Black hole.
@@ -753,7 +1035,7 @@ class SingleStar:
             self.type = 14
             self.mass = mrem2
 
-    def SN_remnant_stochastic(self, mcbagb):
+    def SN_remnant_mandel2020(self, mcbagb):
         m11 = 2.0
         m22 = 3.0
         m33 = 7.0
@@ -763,8 +1045,7 @@ class SingleStar:
         p1 = np.random.random()
         p2 = np.random.random()
 
-        # Compute the probability of complete fallback during BH formation.
-        # 计算黑洞形成时物质完全回落(complete fallback)的概率
+        # Probability of complete fallback in the BH-forming branch.
         if m11 <= self.M_core < m44:
             pcf = (self.M_core - m11) / (m44 - m11)
         else:
@@ -774,11 +1055,10 @@ class SingleStar:
             mean0 = 1.2
             sigma0 = 0.02
             self.type = 13
-            self.mass = np.random.normal(mean0, sigma0)
+            self.mass = self.draw_truncated_normal(mean0, sigma0, 1.13, 2.0)
         # Neutron star or black hole.
         elif m11 <= self.M_core < m33:
-            # Compute the probability that the remnant is a black hole.
-            # 计算遗迹是黑洞的概率
+            # Probability that the remnant becomes a BH rather than an NS.
             pbh = (self.M_core - m11) / (m33 - m11)
             # Black hole.
             if p1 <= pbh:
@@ -788,7 +1068,7 @@ class SingleStar:
                     self.mass = mcbagb
                 # Incomplete fallback.
                 else:
-                    self.mass = np.random.normal(meanbh * self.M_core, sigmabh)
+                    self.mass = self.draw_truncated_normal(meanbh * self.M_core, sigmabh, 2.0, mcbagb)
             # Neutron star.
             else:
                 self.type = 13
@@ -798,7 +1078,7 @@ class SingleStar:
                 else:
                     mean0 = 1.4 + 0.4 * (self.M_core - m22) / (m33 - m22)
                     sigma0 = 0.05
-                self.mass = np.random.normal(mean0, sigma0)
+                self.mass = self.draw_truncated_normal(mean0, sigma0, 1.13, 2.0)
         # Black hole.
         else:
             self.type = 14
@@ -807,86 +1087,150 @@ class SingleStar:
                 self.mass = mcbagb
             # Incomplete fallback.
             else:
-                self.mass = np.random.normal(meanbh * self.M_core, sigmabh)
-        # For stochastic SN, natal kicks follow a normal (Gaussian) distribution.
-        if self.type == 13:
-            self.mass = min(max(1.13, self.mass), 2)
-            self.meanvk = 520.0 * (self.M_core - self.mass) / self.mass
-            self.sigmavk = 0.3 * self.meanvk
-        elif self.type == 14:
-            self.mass = min(max(2.0, self.mass), mcbagb)
-            self.meanvk = 200.0 * max((self.M_core - self.mass) / self.mass, 0.)
-            self.sigmavk = 0.3 * self.meanvk
+                self.mass = self.draw_truncated_normal(meanbh * self.M_core, sigmabh, 2.0, mcbagb)
 
+        # Store the effective fallback fraction implied by the final remnant mass.
+        self.f_fb = (self.mass - 1.4) / (mcbagb - 1.4)
+
+    def SN_remnant_maltsev2025(self, mcbagb):
+        # Map the first donor-side mass-transfer episode to the MT classes used by Maltsev et al. (2025):
+        # 0 -> None, 1 -> Case A, 2 -> Case B, 3 -> Case C.
+        if self.first_mt_case == 0:
+            mco1_zsun, mco2_zsun, mco3_zsun = 6.6, 7.2, 13.0
+            mco1_zsub, mco2_zsub, mco3_zsub = 6.1, 6.6, 12.9
+            mco_ns1_zsun, mco_ns2_zsun = 9.0, 10.2
+            mco_ns1_zsub, mco_ns2_zsub = 7.4, 11.0
+        elif self.first_mt_case == 1:
+            mco1_zsun, mco2_zsun, mco3_zsun = 7.4, 8.4, 15.4
+            mco1_zsub, mco2_zsub, mco3_zsub = 6.9, 7.4, 13.7
+            mco_ns1_zsun, mco_ns2_zsun = 11.1, 12.1
+            mco_ns1_zsub, mco_ns2_zsub = 10.4, 11.1
+        elif self.first_mt_case == 2:
+            mco1_zsun, mco2_zsun, mco3_zsun = 7.7, 8.3, 15.2
+            mco1_zsub, mco2_zsub, mco3_zsub = 6.9, 7.9, 13.7
+            mco_ns1_zsun, mco_ns2_zsun = 9.9, 10.3
+            mco_ns1_zsub, mco_ns2_zsub = 9.3, 10.3
+        elif self.first_mt_case == 3:
+            mco1_zsun, mco2_zsun, mco3_zsun = 6.6, 7.1, 13.2
+            mco1_zsub, mco2_zsub, mco3_zsub = 6.3, 7.1, 12.3
+            mco_ns1_zsun, mco_ns2_zsun = 9.6, 11.7
+            mco_ns1_zsub, mco_ns2_zsub = 8.9, 9.5
+        else:
+            raise ValueError("Unsupported first_mt_case. Expected one of: 0, 1, 2, 3.")
+
+        if self.Z <= 0.0:
+            raise ValueError("Metallicity must be positive for the Maltsev remnant prescription.")
+        if not 0.0 <= ccsn_remnant_maltsev_fallback <= 1.0:
+            raise ValueError("ccsn_remnant_maltsev_fallback must lie within [0, 1].")
+
+        # The BPS recipe takes metallicity in units of Z / Z_sun.
+        # Following the practical recommendation adopted in COMPAS, freeze the critical masses
+        # below Z / Z_sun = 0.05 instead of extrapolating the log-Z scaling indefinitely.
+        z_ratio = max(self.Z / Z_sun, 0.05)
+        logz = np.log10(z_ratio)
+
+        # Log-Z interpolation between the tabulated values at Z_sun and Z_sun / 10.
+        mco_crit_1 = mco1_zsun + logz * (mco1_zsun - mco1_zsub)
+        mco_crit_2 = mco2_zsun + logz * (mco2_zsun - mco2_zsub)
+        mco_crit_3 = mco3_zsun + logz * (mco3_zsun - mco3_zsub)
+        mco_crit_ns1 = mco_ns1_zsun + logz * (mco_ns1_zsun - mco_ns1_zsub)
+        mco_crit_ns2 = mco_ns2_zsun + logz * (mco_ns2_zsun - mco_ns2_zsub)
+
+        # Successful SN with guaranteed NS formation.
+        if self.M_core < mco_crit_1:
+            self.type = 13
+            self.mass = 1.4
+            self.f_fb = 0.0
+        # Failed SN with direct-collapse BH formation.
+        elif self.M_core <= mco_crit_2 or self.M_core >= mco_crit_3:
+            self.type = 14
+            self.mass = mcbagb
+            self.f_fb = 1.0
+        # Successful SN with either NS or fallback-BH formation.
+        else:
+            if ccsn_remnant_maltsev_fallback_model == 'A':
+                # Model A: preserve the metallicity- and MT-dependent NS-guaranteed window.
+                if mco_crit_ns1 <= self.M_core <= mco_crit_ns2:
+                    self.type = 13
+                    self.mass = 1.4
+                    self.f_fb = 0.0
+                elif np.random.random() <= 0.15:
+                    self.type = 14
+                    self.f_fb = ccsn_remnant_maltsev_fallback
+                    self.mass = 1.4 + (mcbagb - 1.4) * self.f_fb
+                else:
+                    self.type = 13
+                    self.mass = 1.4
+                    self.f_fb = 0.0
+            elif ccsn_remnant_maltsev_fallback_model == 'B':
+                # Model B: use a uniform 10% fallback-BH probability across the intermediate region.
+                if np.random.random() <= 0.10:
+                    self.type = 14
+                    self.f_fb = ccsn_remnant_maltsev_fallback
+                    self.mass = 1.4 + (mcbagb - 1.4) * self.f_fb
+                else:
+                    self.type = 13
+                    self.mass = 1.4
+                    self.f_fb = 0.0
+            else:
+                raise ValueError("ccsn_remnant_maltsev_fallback_model must be either 'A' or 'B'.")
 
     # ------------------------------------------------------------------------------------------------------------------
-    #                                        Natal-kick velocity after supernova explosion
+    #                                      Natal-kick velocity after supernova explosion
     # ------------------------------------------------------------------------------------------------------------------
     def SN_kick(self):
         # Neutron star or black hole formed through AIC.
-        # 通过AIC形成的中子星/黑洞
         if self.event == 'AIC':
-            self.v_kick = sigma_AIC * np.random.standard_normal(size=3)
+            self.v_kick = aic_kick_maxwellian_sigma * np.random.standard_normal(size=3)
         # Neutron star formed through ECSN.
-        # 通过ECSN形成的中子星
         elif self.event == 'ECSN':
-            self.v_kick = sigma_ECSN * np.random.standard_normal(size=3)
+            self.v_kick = ecsn_kick_maxwellian_sigma * np.random.standard_normal(size=3)
         # Neutron star or black hole formed through CCSN.
-        # 通过CCSN形成的中子星/黑洞
         elif self.event == 'CCSN':
-            # For rapid/delayed SN models, natal kicks are controlled by CCSN_kick_model.
-            # 对于rapid/delayed SN, natal kick由CCSN_kick_model控制
-            if SNtype == 'rapid' or SNtype == 'delayed':
-                if CCSN_kick_model == 'hobbs2005':
-                    # Hobbs et al. 2005: three Gaussian components, Maxwellian speed
-                    self.v_kick = sigma_CCSN * np.random.standard_normal(size=3)
-                elif CCSN_kick_model == 'disberg2025':
-                    # Disberg & Mandel 2025: lognormal speed with isotropic direction
+            if ccsn_kick_prescription == 'zero':
+                self.v_kick = np.zeros(3)
+            elif ccsn_kick_prescription == 'maxwellian':
+                self.v_kick = ccsn_kick_maxwellian_sigma * np.random.standard_normal(size=3)
+            elif ccsn_kick_prescription == 'lognormal' or ccsn_kick_prescription == 'mandel2020':
+                # Draw the kick magnitude, then combine it with an isotropic direction.
+                if ccsn_kick_prescription == 'lognormal':
                     v_kick_magnitude = np.random.lognormal(
-                        CCSN_kick_lognormal_mu,
-                        CCSN_kick_lognormal_sigma,
+                        ccsn_kick_lognormal_mu,
+                        ccsn_kick_lognormal_sigma,
                     )
-                    if CCSN_kick_lognormal_vmax is not None:
-                        while v_kick_magnitude > CCSN_kick_lognormal_vmax:
+                    if ccsn_kick_lognormal_vmax is not None:
+                        while v_kick_magnitude > ccsn_kick_lognormal_vmax:
                             v_kick_magnitude = np.random.lognormal(
-                                CCSN_kick_lognormal_mu,
-                                CCSN_kick_lognormal_sigma,
+                                ccsn_kick_lognormal_mu,
+                                ccsn_kick_lognormal_sigma,
                             )
-
-                    phi = np.random.uniform(0.0, 2.0 * np.pi)
-                    cos_theta = np.random.uniform(-1.0, 1.0)
-                    sin_theta = np.sqrt(1.0 - cos_theta * cos_theta)
-                    self.v_kick = v_kick_magnitude * np.array([
-                        cos_theta,
-                        sin_theta * np.cos(phi),
-                        sin_theta * np.sin(phi),
-                    ])
                 else:
-                    raise ValueError("Unsupported CCSN_kick_model. Expected one of: 'hobbs2005', 'disberg2025'.")
+                    v_kick_magnitude = self.draw_truncated_normal(self.kick_mean, self.kick_sigma)
 
-                # For black holes, scale the natal kick by the fallback factor relative to the neutron-star kick.
-                # 对于黑洞, 受到的速度踢在中子星的基础上乘上一个回落因子
-                if self.type == 14:
-                    self.v_kick = self.v_kick * (1 - self.f_fb)
-            # For stochastic SN, the natal kick follows a normal (Gaussian) distribution.
-            elif SNtype == 'stochastic':
-                # Kick magnitude.
-                v_kick_magnitude = np.random.normal(self.meanvk, self.sigmavk)
-                # Kick direction.
-                phi = np.random.uniform(0, 2 * np.pi)
-                # Compute the polar angle theta.
-                theta = np.arccos(np.random.uniform(-1, 1))
-                # Kick coordinates.
-                x = np.cos(theta)
-                y = np.sin(theta) * np.cos(phi)
-                z = np.sin(theta) * np.sin(phi)
-                # Kick vector.
-                self.v_kick = v_kick_magnitude * np.array([x, y, z])
+                phi = np.random.uniform(0.0, 2.0 * np.pi)
+                cos_theta = np.random.uniform(-1.0, 1.0)
+                sin_theta = np.sqrt(1.0 - cos_theta * cos_theta)
+                self.v_kick = v_kick_magnitude * np.array([
+                    cos_theta,
+                    sin_theta * np.cos(phi),
+                    sin_theta * np.sin(phi),
+                ])
             else:
-                raise ValueError("Unsupported SNtype. Expected one of: 'rapid', 'delayed', 'stochastic'.")
+                raise ValueError(
+                    "Unsupported ccsn_kick_prescription. Expected one of: 'zero', 'maxwellian', 'lognormal', 'mandel2020'."
+                )
+            # Apply the requested BH kick scaling unless the Mandel prescription was used directly.
+            if self.type == 14 and ccsn_kick_prescription != 'mandel2020':
+                if ccsn_kick_bh_scaling == 'full':
+                    pass
+                elif ccsn_kick_bh_scaling == 'zero':
+                    self.v_kick = np.zeros(3)
+                elif ccsn_kick_bh_scaling == 'fallback':
+                    self.v_kick = self.v_kick * (1 - self.f_fb)
+                else:
+                    raise ValueError("Unsupported ccsn_kick_bh_scaling. Expected one of: 'full', 'zero', 'fallback'.")
         else:
             raise ValueError("Unsupported supernova event. Expected one of: 'AIC', 'ECSN', 'CCSN'.")
-
 
     # ------------------------------------------------------------------------------------------------------------------
     #                                Determine the envelope binding-energy parameter lambda
@@ -899,12 +1243,12 @@ class SingleStar:
 
         # Compute the binding-energy parameter for hydrogen-rich stars.
         # 富氢恒星的结合能参数计算
-        if lambda_binding == 'WJL2016':
+        if ce_lambda_prescription == 'wjl2016':
             self.cal_lambda_WJL2016()
-        elif lambda_binding == 'XL2010':
+        elif ce_lambda_prescription == 'xl2010':
             self.cal_lambda_XL2010()
         else:
-            raise ValueError("Unsupported lambda_binding. Expected one of: 'WJL2016', 'XL2010'.")
+            raise ValueError("Unsupported ce_lambda_prescription. Expected one of: 'wjl2016', 'xl2010'.")
 
     def cal_lambda_WJL2016(self):
         arr = np.array([0.06, 1.5, 3, 5, 7, 9, 15, 25, 35, 50])
@@ -981,11 +1325,11 @@ class SingleStar:
 
         # For Z = 0.02.
         lambda_b, lambda_g = lambda_XL2010(Z=0.02, stage=stage, mass0=mass0, R=self.R_mt, m_env=m_env)
-        lambda_002 = lambda_b * alpha_th + lambda_g * (1 - alpha_th)
+        lambda_002 = lambda_b * ce_internal_energy_fraction + lambda_g * (1 - ce_internal_energy_fraction)
 
         # For Z = 0.001.
         lambda_b, lambda_g = lambda_XL2010(Z=0.001, stage=stage, mass0=mass0, R=self.R_mt, m_env=m_env)
-        lambda_0001 = lambda_b * alpha_th + lambda_g * (1 - alpha_th)
+        lambda_0001 = lambda_b * ce_internal_energy_fraction + lambda_g * (1 - ce_internal_energy_fraction)
 
         # Interpolate to the actual metallicity.
         if self.Z >= 0.02:
@@ -1846,6 +2190,7 @@ class SingleStar:
                 self.type = 10
         # Helium Shell Burning
         else:
+            old_type = self.type
             self.type = 8
             self.L = self.lgbtf(self.GB[8])
             self.R = self.rhehgf(self.mass, self.L, rzams, self.lums[2])
@@ -1855,6 +2200,9 @@ class SingleStar:
                 self.R = self.rg
             self.M_core = self.lum_to_mc_gb(self.L)
 
+            if initialize or old_type != self.type:
+                return
+            
             # Case 1: the helium-star envelope is fully stripped. Degenerate CO/ONe cores become WDs,
             # while non-degenerate CO cores trigger supernovae. If the He-star mass is below 0.7 Msun,
             # the He envelope cannot be fully converted into a CO core, so limit the CO-core mass for low-mass He stars.
@@ -1874,7 +2222,7 @@ class SingleStar:
             # Degenerate CO core: become a CO WD or trigger a Type Ia SN depending on core mass.
             # 简并CO核, 根据核质量变成CO白矮星或引发Ia超新星
             if self.mass0 < 1.83:
-                if mcmax - self.M_core < 1e-10 and not initialize:
+                if mcmax - self.M_core < 1e-10:
                     self.age = 0
                     self.M_core = mcmax
                     if mcmax < mcmax_2:
@@ -1890,7 +2238,7 @@ class SingleStar:
             # Degenerate ONe core: become an ONe WD or trigger an ECSN leaving a neutron star.
             # 简并的ONe核, 根据核质量变成ONe白矮星或引发ECSN留下中子星
             elif self.mass0 < 2.25:
-                if mcmax - self.M_core < 1e-10 and not initialize:
+                if mcmax - self.M_core < 1e-10:
                     self.age = 0
                     self.M_core = mcmax
                     if mcmax < mcmax_2:
@@ -1909,7 +2257,7 @@ class SingleStar:
             # 非简并的CO核, 如果包层被剥离后还没达到SN爆炸临界值, 热核会冷却由非简并 → 简并, 根据热核质量确定最终结果(这里尚待商榷)
             else:
                 # print(self.step, self.type, self.mass0, self.mass, mcmax, self.M_core)
-                if mcmax - self.M_core < 1e-10 and not initialize:
+                if mcmax - self.M_core < 1e-10:
                     self.age = 0
                     self.M_core = mcmax
                     if mcmax < mcmax_2:
@@ -1977,7 +2325,7 @@ class SingleStar:
         xx = ahe if self.type == 10 else aco
 
         # Modified Mestel cooling (unused).
-        if WD_flag:
+        if wd_use_modified_mestel_cooling:
             if self.age < 9000:
                 self.L = 300 * self.mass * self.zpars[14] / (xx * (self.age + 0.1)) ** 1.18
             else:
@@ -2003,7 +2351,7 @@ class SingleStar:
 
         # AIC black hole.
         # AIC黑洞
-        if self.mass > M_ns_max and not initialize:
+        if self.mass > max_ns_mass and not initialize:
             self.type = 14
             self.age = 0.0
             self.event = 'AIC'
@@ -2055,7 +2403,7 @@ class SingleStar:
             else:
                 self.R_core = 5 * 0.0115 * np.sqrt(
                     max(1.48204e-6, (M_ch / self.M_core) ** (2 / 3) - (self.M_core / M_ch) ** (2 / 3)))
-                if WD_flag:
+                if wd_use_modified_mestel_cooling:
                     self.L_core = 300.0 * self.M_core * self.zpars[14] / ((ahe * 0.1) ** 1.18)
                 else:
                     self.L_core = 635.0 * self.M_core * self.zpars[14] / ((ahe * 0.1) ** 1.4)
@@ -2092,7 +2440,7 @@ class SingleStar:
         elif self.type == 6 or 8 <= self.type <= 9:
             self.R_core = 5 * 0.0115 * np.sqrt(
                 max(1.48204e-6, (M_ch / self.M_core) ** (2 / 3) - (self.M_core / M_ch) ** (2 / 3)))
-            if WD_flag:
+            if wd_use_modified_mestel_cooling:
                 self.L_core = 300 * self.M_core * self.zpars[14] / ((aco * 0.1) ** 1.18)
             else:
                 self.L_core = 635 * self.M_core * self.zpars[14] / ((aco * 0.1) ** 1.4)
@@ -2916,3 +3264,25 @@ class SingleStar:
                 ratio = mc / mc_current
                 ratio = max(0.5, min(2.0, ratio))
                 m0 = m0 * ratio
+
+# ------------------------------------------------------------------------------------------------------------------
+#                                        Some convenient utility functions.
+# ------------------------------------------------------------------------------------------------------------------
+    # Draw a random sample from a truncated normal distribution.
+    @staticmethod
+    def draw_truncated_normal(mu, sigma, lower=0.0, upper=2000.0, max_iter=100):
+        if sigma < 0:
+            raise ValueError("sigma must be non-negative.")
+        if lower >= upper:
+            raise ValueError("lower must be smaller than upper.")
+        if sigma == 0:
+            if lower <= mu < upper:
+                return mu
+            raise ValueError("mu must lie within [lower, upper) when sigma == 0.")
+
+        for _ in range(max_iter):
+            x = np.random.normal(mu, sigma)
+            if lower <= x < upper:
+                return x
+        raise RuntimeError(f"Failed after {max_iter} tries: mu={mu}, sigma={sigma}, lower={lower}, upper={upper}")
+     

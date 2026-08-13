@@ -248,8 +248,8 @@ def create_popsin_parameter_space(
     Args:
         m_range: Stellar mass range [unit: M_sun], allowed range: [0.1, 100.0]
         n_grid_popsin: Number of grid points in logarithmic mass space
-        IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
-        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013'
+        IMF_scheme: IMF model name. Must be one of: 'kroupa2002', 'kroupa1993', or 'weisz2015'
+        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'haaften2013'
 
     Returns:
         2D array with shape (n_grid_popsin, 2)
@@ -301,8 +301,8 @@ def weight_single(
         M: Stellar mass [unit: M_sun]
         m_range: Mass range for grid calculation (min_m, max_m)
         n_grid_popsin: Number of grid points in logarithmic mass space
-        IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
-        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013'
+        IMF_scheme: IMF model name. Must be one of: 'kroupa2002', 'kroupa1993', or 'weisz2015'
+        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'haaften2013'
 
     Returns:
         Weight value(s) for single stars
@@ -345,13 +345,13 @@ def create_popbin_parameter_space(
     Args:
         m1_range: Primary star mass range [unit: M_sun], allowed range: [0.1, 100.0]
         m2_range: Secondary star mass range [unit: M_sun], allowed range: [0.1, 100.0]
-        orbit_param_range: Orbital period range [unit: days] (Sana2012) or semi-major axis range
-            [unit: R_sun] (Hurley2002). If None, the default range is inferred from ini_orbit_scheme.
+        orbit_param_range: Orbital period range [unit: days] (sana2012) or semi-major axis range
+            [unit: R_sun] (hurley2002). If None, the default range is inferred from ini_orbit_scheme.
         n_grid_popbin: Number of grid points for each parameter in logarithmic space
-        ini_orbit_scheme: Initial orbit model. Must be one of: 'Sana2012', 'Hurley2002'
+        ini_orbit_scheme: Initial orbit model. Must be one of: 'sana2012', 'hurley2002'
         ini_ecc_scheme: Initial eccentricity distribution. Must be one of: 'zero', 'uniform', 'thermal'
-        IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
-        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013'
+        IMF_scheme: IMF model name. Must be one of: 'kroupa2002', 'kroupa1993', or 'weisz2015'
+        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'haaften2013'
         random_seed: Random seed for eccentricity sampling, defaults to 1
 
     Returns:
@@ -374,23 +374,23 @@ def create_popbin_parameter_space(
 
     # 2. Generate orbital parameter grid
     if orbit_param_range is None:
-        if ini_orbit_scheme == 'Sana2012':
+        if ini_orbit_scheme == 'sana2012':
             orbit_param_range = (10 ** log10_P_range[0], 10 ** log10_P_range[1])
-        elif ini_orbit_scheme == 'Hurley2002':
+        elif ini_orbit_scheme == 'hurley2002':
             orbit_param_range = sep_range
 
-    if ini_orbit_scheme == 'Sana2012':
+    if ini_orbit_scheme == 'sana2012':
         orbit_values = np.logspace(
             np.log10(orbit_param_range[0]), np.log10(orbit_param_range[1]), num=n_grid_popbin, endpoint=True
         )
-        logger.info(f"Using Sana2012 orbital model: period range {orbit_param_range}", extra={"console": True})
-    elif ini_orbit_scheme == 'Hurley2002':
+        logger.info(f"Using sana2012 orbital model: period range {orbit_param_range}", extra={"console": True})
+    elif ini_orbit_scheme == 'hurley2002':
         orbit_values = np.logspace(
             np.log(orbit_param_range[0]), np.log(orbit_param_range[1]), num=n_grid_popbin, endpoint=True, base=np.e
         )
-        logger.info(f"Using Hurley2002 orbital model: semi-major axis range {orbit_param_range}", extra={"console": True})
+        logger.info(f"Using hurley2002 orbital model: semi-major axis range {orbit_param_range}", extra={"console": True})
     else:
-        raise ValueError(f"Unsupported orbital model: {ini_orbit_scheme}, available options: 'Sana2012', 'Hurley2002'")
+        raise ValueError(f"Unsupported orbital model: {ini_orbit_scheme}, available options: 'sana2012', 'hurley2002'")
 
     # 3. Generate 3D grid (m1, m2, orbit)
     parameter_space = np.array(np.meshgrid(m1_values, m2_values, orbit_values)).T.reshape(-1, 3)
@@ -451,21 +451,21 @@ def weight_binary(
     """Calculate the weight contribution of binary systems to the stellar population
 
     The weight formula for binary systems depends on the orbital model:
-        - Sana2012: Uses period distribution (log10 P), requires period parameter
-        - Hurley2002: Uses semi-major axis distribution (ln a), independent of specific sep
+        - sana2012: Uses period distribution (log10 P), requires period parameter
+        - hurley2002: Uses semi-major axis distribution (ln a), independent of specific sep
 
     Args:
         M1: Primary star mass [unit: M_sun]
         M2: Secondary star mass [unit: M_sun]
-        orbit_param: Orbital period [unit: days] (Sana2012 model) or orbital semi-major axis [unit: R_sun] (Hurley2002 model)
+        orbit_param: Orbital period [unit: days] (sana2012 model) or orbital semi-major axis [unit: R_sun] (hurley2002 model)
         m1_range: Primary star mass range
         m2_range: Secondary star mass range
-        orbit_param_range: Orbital period range [unit: days] (Sana2012) or semi-major axis range
-            [unit: R_sun] (Hurley2002). If None, the default range is inferred from ini_orbit_scheme.
+        orbit_param_range: Orbital period range [unit: days] (sana2012) or semi-major axis range
+            [unit: R_sun] (hurley2002). If None, the default range is inferred from ini_orbit_scheme.
         n_grid_popbin: Number of grid points for each parameter in logarithmic space
-        ini_orbit_scheme: Initial orbit model. Support 'Sana2012' and 'Hurley2002'
-        IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
-        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013'
+        ini_orbit_scheme: Initial orbit model. Support 'sana2012' and 'hurley2002'
+        IMF_scheme: IMF model name. Must be one of: 'kroupa2002', 'kroupa1993', or 'weisz2015'
+        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'haaften2013'
 
     Returns:
         Weight value(s) for binary systems
@@ -486,12 +486,12 @@ def weight_binary(
 
     # Calculate based on orbital model
     if orbit_param_range is None:
-        if ini_orbit_scheme == 'Sana2012':
+        if ini_orbit_scheme == 'sana2012':
             orbit_param_range = (10 ** log10_P_range[0], 10 ** log10_P_range[1])
-        elif ini_orbit_scheme == 'Hurley2002':
+        elif ini_orbit_scheme == 'hurley2002':
             orbit_param_range = sep_range
 
-    if ini_orbit_scheme == 'Sana2012':
+    if ini_orbit_scheme == 'sana2012':
         # Period distribution function
         Psi_log10_P = _get_log10_P_normalize_factor() * np.log10(orbit_param) ** log10_P_index
 
@@ -500,7 +500,7 @@ def weight_binary(
 
         weight = weight * Psi_log10_P * delta_log10_P
 
-    elif ini_orbit_scheme == 'Hurley2002':
+    elif ini_orbit_scheme == 'hurley2002':
         # Semi-major axis distribution function (uniform in ln a space)
         Psi_lna = 1 / np.log(sep_max / sep_min)
 
@@ -510,7 +510,7 @@ def weight_binary(
         weight = weight * Psi_lna * delta_lna
 
     else:
-        raise ValueError(f"Unsupported orbital model: {ini_orbit_scheme}, available options: 'Sana2012', 'Hurley2002'")
+        raise ValueError(f"Unsupported orbital model: {ini_orbit_scheme}, available options: 'sana2012', 'hurley2002'")
 
     return weight
 
@@ -544,13 +544,13 @@ def initial_mass_function(
     """Calculate the stellar Initial Mass Function (IMF)
 
     Supports three commonly used IMF models:
-        - Kroupa2002: Kroupa (2002) three-segment power law (default)
-        - Kroupa1993: Kroupa et al. (1993) three-segment power law
-        - Weisz2015: Weisz et al. (2015) three-segment power law
+        - kroupa2002: Kroupa (2002) three-segment power law (default)
+        - kroupa1993: Kroupa et al. (1993) three-segment power law
+        - weisz2015: Weisz et al. (2015) three-segment power law
 
     Args:
         M: Stellar mass [unit: M_sun], range 0.08 - 150
-        IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
+        IMF_scheme: IMF model name. Must be one of: 'kroupa2002', 'kroupa1993', or 'weisz2015'
 
     Returns:
         IMF value, representing the relative probability density at the given mass
@@ -558,16 +558,16 @@ def initial_mass_function(
     Raises:
         ValueError: When IMF_scheme is not supported
     """
-    if IMF_scheme == 'Kroupa2002':
+    if IMF_scheme == 'kroupa2002':
         return imf_kroupa2002(M)
-    elif IMF_scheme == 'Kroupa1993':
+    elif IMF_scheme == 'kroupa1993':
         return imf_kroupa1993(M)
-    elif IMF_scheme == 'Weisz2015':
+    elif IMF_scheme == 'weisz2015':
         return imf_weisz2015(M)
     else:
         raise ValueError(
             f"Unsupported IMF model: {IMF_scheme}, "
-            f"available options: 'Kroupa2002', 'Kroupa1993', 'Weisz2015'"
+            f"available options: 'kroupa2002', 'kroupa1993', 'weisz2015'"
         )
 
 
@@ -660,12 +660,12 @@ def frac_binary(
     """Calculate the fraction of binary systems among stars
 
     Supports two input modes:
-        1. String 'Haaften2013': Use Haaften et al. (2013) model
+        1. String 'haaften2013': Use Haaften et al. (2013) model
         2. Float: Directly return the specified fraction
 
     Args:
         M: Stellar mass [unit: M_sun]
-        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013' for the mass-dependent model.
+        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'haaften2013' for the mass-dependent model.
 
     Returns:
         Binary fraction, range [0, 1]
@@ -682,11 +682,11 @@ def frac_binary(
         return binary_fraction
 
     # Case 2: String preset model
-    if binary_fraction == 'Haaften2013':
+    if binary_fraction == 'haaften2013':
         return 0.5 + 0.25 * np.log10(M)
     else:
         raise ValueError(
-            f"binary_fraction must be a float in [0, 1] or 'Haaften2013', "
+            f"binary_fraction must be a float in [0, 1] or 'haaften2013', "
             f"got: {binary_fraction}"
         )
 
@@ -701,8 +701,8 @@ def average_stellar_mass(
     For single stars, the system mass equals the stellar mass.
 
     Args:
-        IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
-        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013'
+        IMF_scheme: IMF model name. Must be one of: 'kroupa2002', 'kroupa1993', or 'weisz2015'
+        binary_fraction: Binary fraction. Can be a float in [0, 1] or 'haaften2013'
 
     Returns:
         Average system mass [unit: M_sun]

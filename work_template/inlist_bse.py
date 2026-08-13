@@ -8,9 +8,9 @@
 # ============================================================================================================
 
 
-m1 = 8.67                                  # Initial primary-star mass [unit: M_sun].
-m2 = 4.50                                   # Initial secondary-star mass [unit: M_sun].
-period = 28.85                            # Initial orbital period [unit: days]. Used before sep when both are set.
+m1 = 20.0                                  # Initial primary-star mass [unit: M_sun].
+m2 = 2.0                                   # Initial secondary-star mass [unit: M_sun].
+period = 1000.0                            # Initial orbital period [unit: days]. Used before sep when both are set.
 
 # sep = 1000.0                             # Initial orbital separation [unit: R_sun].
 # ecc = 0.0                                # Initial orbital eccentricity, range [0, 1).

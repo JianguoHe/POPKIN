@@ -1,15 +1,18 @@
 import numpy as np
-from popkin.stars.single_star import SingleStar
 from numba import float64, int64, types, from_dtype
 from popkin.utils import conditional_jitclass
-from popkin.constants import G, M_sun, R_sun, sec_per_year, day_per_year, sep_to_period, period_to_sep
 from popkin.constants import struct_dtype_binary
+from popkin.constants import day_per_year, sep_to_period, period_to_sep
+from popkin.stars.single_star import SingleStar
 from popkin.stars.mt_stability import MT_stability_MS
 from popkin.stars.sn_binary import post_supernova_orbit
-from popkin.config.controls_default import ini_spin_scheme, max_step, max_time, jit_enabled
-from popkin.config.controls_default import alpha_CE, HG_survive_CE, M_ch, M_ECSN, M_ns_max
-from popkin.config.controls_default import alpha_wind, beta_wind, mu_wind
-from popkin.config.controls_default import eddfac, mass_accretion_model, epsnov, WD_crit_accretion, M_wd_ns_crit
+from popkin.config.controls_default import (
+    ini_spin_scheme, max_step, max_time, jit_enabled,
+    ce_alpha, ce_allow_hg_survival, max_ns_mass,
+    mass_transfer_eddington_factor, mass_accretion_model,
+    wind_bhl_factor, wind_velocity_scale, wind_angular_momentum_efficiency,
+    wd_nova_retention_fraction, wd_supercritical_accretion_model, max_wd_mass_stable_mt_to_ns_bh,
+)
 from popkin.config.user_config import apply_user_config
 
 apply_user_config(globals(), "inlist")
@@ -552,6 +555,17 @@ class BinaryStar:
         # 确定充满洛希瓣程度更深的恒星
         i = r_rl.index(max(r_rl))
 
+        # Record the first donor-side mass-transfer case for the current donor.
+        if stars[i].first_mt_case == 0:
+            if stars[i].type <= 1:
+                stars[i].first_mt_case = 1
+            elif stars[i].type <= 4:
+                stars[i].first_mt_case = 2
+            elif stars[i].type <= 6:
+                stars[i].first_mt_case = 3
+            else:
+                pass
+
         # Determine whether mass transfer is dynamically stable.
         # 确定物质转移的稳定性
         if r_rl[0] >= 1 and r_rl[1] >= 1:
@@ -570,7 +584,7 @@ class BinaryStar:
             # WD + NS/BH system: form an UCXB or merge depending on the WD mass.
             # 白矮星+中子星/黑洞 → UCXBs/合并
             elif stars[i].type in {10, 11, 12} and stars[1 - i].type in {13, 14}:
-                if stars[i].mass > M_wd_ns_crit:
+                if stars[i].mass > max_wd_mass_stable_mt_to_ns_bh:
                     stable = False
                 else:
                     stable = True
@@ -865,7 +879,7 @@ class BinaryStar:
             # while the WD retains only a small fraction (Hurley et al. 2002, Eq. 66).
             # 持续吸积直到新星爆发, 同时吹散大部分的吸积物质, 白矮星保留少量吸积物质
             if abs(stars[i].mdot_mt) < M_dot_stable:
-                stars[1 - i].mdot_mt = - stars[i].mdot_mt * epsnov
+                stars[1 - i].mdot_mt = - stars[i].mdot_mt * wd_nova_retention_fraction
             
             # Stable nuclear burning on the WD surface; this phase can appear as an X-ray source.
             # 在白矮星表面稳定燃烧(X射线源)
@@ -878,16 +892,16 @@ class BinaryStar:
                 # Specific orbital angular momentum carried away by the common-envelope wind
                 # (Cui et al. 2022, doi:10.1051/0004-6361/202141335, Eq. 11).
                 # 公共包层星风模型带走的比轨道角动量
-                if WD_crit_accretion == 'CE-wind':
+                if wd_supercritical_accretion_model == 'CE-wind':
                     stars[1 - i].mdot_mt = M_dot_crit
                     specific_angular_momentum = self.omega * (self.sep + 0.1 * self.sep) ** 2
                 # Optically thick wind model.
                 # 光学厚星风模型
-                elif WD_crit_accretion == 'OTW':
+                elif wd_supercritical_accretion_model == 'OTW':
                     stars[1 - i].mdot_mt = M_dot_crit
                 # Common-envelope model.
                 # 公共包层模型
-                elif WD_crit_accretion == 'CE':
+                elif wd_supercritical_accretion_model == 'CE':
                     stars[1 - i].mdot_mt = - stars[i].mdot_mt
                     self.save()
 
@@ -925,7 +939,7 @@ class BinaryStar:
                     return
                 else:
                     raise ValueError(
-                        "Unsupported WD_crit_accretion. Expected one of: 'CE-wind', 'OTW', 'CE'."
+                        "Unsupported wd_supercritical_accretion_model. Expected one of: 'CE-wind', 'OTW', 'CE'."
                     )
 
         # He WD accreting He-rich material.
@@ -971,7 +985,7 @@ class BinaryStar:
 
         # Limit all accretion to the Eddington accretion rate.
         # 将所有的吸积限定在爱丁顿吸积率
-        edd_limit = 2.08e-3 * eddfac * (1 / (1 + stars[1 - i].zpars[11])) * stars[1 - i].R
+        edd_limit = 2.08e-3 * mass_transfer_eddington_factor * (1 / (1 + stars[1 - i].zpars[11])) * stars[1 - i].R
         stars[1 - i].mdot_mt = min(stars[1 - i].mdot_mt, edd_limit)
 
         # Orbital angular-momentum loss caused by non-conservative mass transfer.
@@ -1103,7 +1117,7 @@ class BinaryStar:
             # Such systems are associated with short gamma-ray bursts and gravitational-wave events.
             # 双中子星系统并合后根据质量可能会成为黑洞, 对应的观测有短暴、引力波
             mass_total = stars[i].mass + stars[1 - i].mass
-            stars[i].type = 13 if mass_total < M_ns_max else 14
+            stars[i].type = 13 if mass_total < max_ns_mass else 14
             stars[i].mass = mass_total
             stars[i].age = 0
         # WD + NS/BH
@@ -1112,7 +1126,7 @@ class BinaryStar:
             # or be added to the compact-object mass. This channel may be related to long gamma-ray bursts.
             # 白矮星潮汐瓦解之后, 如果存在吸积盘, 应该会进入吸积盘, 否则应该加到中子星黑洞质量上？有可能发生长伽马暴？
             mass_total = stars[i].mass + stars[1 - i].mass
-            stars[i].type = 13 if mass_total < M_ns_max else 14
+            stars[i].type = 13 if mass_total < max_ns_mass else 14
             stars[i].mass = mass_total
             stars[i].age = 0
         # WD + WD
@@ -1219,7 +1233,7 @@ class BinaryStar:
 
         # Final orbital energy if the envelope is successfully ejected.
         # 计算没有合并的最终轨道能量
-        eorbf = eorbi + ebindi / alpha_CE
+        eorbf = eorbi + ebindi / ce_alpha
 
         # Donor mass and radius after CE envelope removal.
         # CE后的主星质量/半径
@@ -1245,7 +1259,7 @@ class BinaryStar:
 
         # Decide whether an HG donor is allowed to survive CE evolution.
         # 是否允许 HG donor 离开CE
-        if stars[i].type == 2 and not HG_survive_CE:
+        if stars[i].type == 2 and not ce_allow_hg_survival:
             self.CE_merge(i, ebindi, eorbi)
             return
 
@@ -1324,7 +1338,7 @@ class BinaryStar:
             # at the point where one of the stellar cores just fills its Roche lobe.
             # 首先通过并合前(当某个核恰好充满洛希瓣时)轨道能的变化量计算并合前一刻的结合能
             sep_f = max(stars[i].R / self.rl_ratio(q[i]), stars[1 - i].R / self.rl_ratio(q[1 - i]))
-            ebindf = ebindi + alpha_CE * (eorbi - stars[i].mass * stars[1 - i].mass / (2 * sep_f))
+            ebindf = ebindi + ce_alpha * (eorbi - stars[i].mass * stars[1 - i].mass / (2 * sep_f))
             total_mass_before = self.data[self.step - 1]['m1'] + self.data[self.step - 1]['m2']
 
             # Determine the core mass of the newly formed star.
@@ -1637,7 +1651,7 @@ class BinaryStar:
             star1 = [self.star1, self.star2][i]
             star2 = [self.star1, self.star2][1 - i]
             term1 = star1.mdot_wind_loss * star1.spin * star1.R ** 2
-            term2 = star1.mdot_wind_acc * star2.spin * star2.R ** 2 * mu_wind
+            term2 = star1.mdot_wind_acc * star2.spin * star2.R ** 2 * wind_angular_momentum_efficiency
             star1.jdot_wind = (term1 + term2) * (2 / 3)
         # Orbital angular-momentum loss caused by stellar winds.
         # 轨道角动量的变化率
@@ -1668,11 +1682,11 @@ class BinaryStar:
             # 计算 star2 从 star1 星风中质量吸积率, 用 mdot_wind_acc 表示(Boffin & Jorissen, A&A 1988, 205, 155).
             # 在公式v=GM/R中, 可以简化为v=M/R, 单位换算系数在eq.(6) of Hurley et al. 2002中会抵消掉
             vorb2 = (star1.mass + star2.mass) / self.sep
-            vwind2 = 2.0 * beta_wind * star1.mass / star1.R
+            vwind2 = 2.0 * wind_velocity_scale * star1.mass / star1.R
             term1 = 1.0 / np.sqrt(1.0 - self.ecc ** 2)
             term2 = (star2.mass / vwind2) ** 2
             term3 = 1 / (1.0 + vorb2 / vwind2) ** 1.5
-            term4 = alpha_wind * abs(star1.mdot_wind_loss) / (2.0 * self.sep ** 2)
+            term4 = wind_bhl_factor * abs(star1.mdot_wind_loss) / (2.0 * self.sep ** 2)
             star2.mdot_wind_acc = term1 * term2 * term3 * term4
             star2.mdot_wind_acc = min(star2.mdot_wind_acc, 0.8 * abs(star1.mdot_wind_loss))
 
@@ -1716,24 +1730,23 @@ class BinaryStar:
                 # 因此我们可以用洛希瓣半径作为恒星的真实半径代入潮汐及星风计算中
                 raa2 = (star1.R / self.sep) ** 2
                 raa6 = raa2 ** 3
-                ecc2 = self.ecc ** 2
-                omecc2 = 1 - self.ecc ** 2
-                sqome2 = np.sqrt(1 - self.ecc ** 2)
-                sqome3 = sqome2 ** 3
-                # Hut's eccentricity polynomials.
-                # 赫维茨多项式
-                f5 = 1 + ecc2 * (3 + ecc2 * 0.375)
-                f4 = 1 + ecc2 * (1.5 + ecc2 * 0.125)
-                f3 = 1 + ecc2 * (3.75 + ecc2 * (1.875 + ecc2 * 7.8125e-2))
-                f2 = 1 + ecc2 * (7.5 + ecc2 * (5.625 + ecc2 * 0.3125))
-                f1 = 1 + ecc2 * (15.5 + ecc2 * (31.875 + ecc2 * (11.5625 + ecc2 * 0.390625)))
+                # Hut's eccentricity polynomials and convenience factors.
+                # 赫维茨多项式及相关辅助量
+                f1, f2, f3, f4, f5, omecc2, sqome2, sqome3 = self.hut_ecc_terms(self.ecc)
+
                 if (star1.type == 1 and star1.mass >= 1.25) or star1.type == 4 or star1.type == 7:
                     # Radiative damping (Zahn, 1977, A&A, 57, 383 and 1975, A&A, 41, 329).
-                    # 辐射阻尼
-                    tc = 1.592e-9 * (star1.mass ** 2.84)
-                    f = 1.9782e4 * np.sqrt((star1.mass * star1.R ** 2) / self.sep ** 5) * tc * (1 + q) ** (5 / 6)
-                    tcqr = f * q * raa6
-                    rg2 = star1.k2
+                    # tc = 1.592e-9 * (star1.mass ** 2.84)
+                    # f = 1.9782e4 * np.sqrt((star1.mass * star1.R ** 2) / self.sep ** 5) * tc * (1 + q) ** (5 / 6)
+                    # tcqr = f * q * raa6
+                    # rg2 = star1.k2t
+                    # Radiative-envelope tides use the Sciarini et al. (2024) correction
+                    # instead of the legacy Hurley (2002) synchronization approximation.
+                    edot_tide_i, torque, spin_dot_i = self.apply_radiative_tide_sciarini(star1, star2, adjustment)
+                    self.edot_tide += edot_tide_i
+                    star1.jdot_tide = torque
+                    self.jdot_tide -= star1.jdot_tide
+                    continue
                 elif star1.type <= 9:
                     # Convective damping (Hut, 1981, A&A, 99, 126).
                     # 对流阻尼
@@ -1746,9 +1759,6 @@ class BinaryStar:
                     f = min(1, (ttid / (2 * tc) ** 2))
                     tcqr = 2 * f * q * raa6 * star1.M_conv_env / (21 * tc * star1.mass)
                     rg2 = (star1.k2 * (star1.mass - star1.M_core)) / star1.mass
-                    # if i == 0:
-                    #     print('tc', star1.M_conv_env, star1.R_conv_env, R_true, star1.L, tc, te, te ** 0.3)
-                    #     print('tcqr:', f, q, raa6, star1.M_conv_env, tc, star1.mass)
                 else:
                     # Degenerate damping (Campbell, 1984, MNRAS, 207, 433).
                     # 简并阻尼
@@ -1759,8 +1769,7 @@ class BinaryStar:
                 # 计算圆化
                 self.edot_tide += -27 * tcqr * (1 + q) * raa2 * (self.ecc / sqome2 ** 13) * (
                         f3 - (11 / 18) * sqome3 * f4 * star1.spin / self.omega)
-                # if self.step > 400:
-                #     print('tide:', self.step, self.edot_tide, star1.spin, self.omega, f3 - (11 / 18) * sqome3 * f4 * star1.spin / self.omega)
+
                 tcirc = self.ecc / (abs(self.edot_tide) + 1e-20)
                 # Equilibrium spin in the absence of angular-momentum exchange.
                 # 计算没有角动量能被转移时的平衡自旋
@@ -1784,12 +1793,168 @@ class BinaryStar:
                 # 计算潮汐造成的轨道角动量变化(与恒星自旋角动量相互转化)
                 self.jdot_tide -= star1.jdot_tide
 
-                # print('恒星质量', star1.mass)
-                # print(star1.jdot_tide, self.jdot_tide)
-                # print(star1_spin_dot, q, tcqr, rg2, self.omega, star1.spin, self.omega - star1.spin)
+    @staticmethod
+    def hut_ecc_terms(ecc):
+        """Return the Hut (1981) eccentricity polynomials and convenience factors.
 
-                # if star1.type <= 6 or abs(djt) / jspin[k] > 0.1:
-                #     djtt = djtt + djt
+        Parameters
+        ----------
+        ecc : float
+            Orbital eccentricity.
+
+        Returns
+        -------
+        tuple
+            ``(f1, f2, f3, f4, f5, omecc2, sqome2, sqome3)``
+        """
+        ecc2 = ecc ** 2
+        omecc2 = 1.0 - ecc2
+        sqome2 = np.sqrt(omecc2)
+        sqome3 = sqome2 ** 3
+
+        f5 = 1.0 + ecc2 * (3.0 + ecc2 * 0.375)
+        f4 = 1.0 + ecc2 * (1.5 + ecc2 * 0.125)
+        f3 = 1.0 + ecc2 * (3.75 + ecc2 * (1.875 + ecc2 * 7.8125e-2))
+        f2 = 1.0 + ecc2 * (7.5 + ecc2 * (5.625 + ecc2 * 0.3125))
+        f1 = 1.0 + ecc2 * (15.5 + ecc2 * (31.875 + ecc2 * (11.5625 + ecc2 * 0.390625)))
+        return f1, f2, f3, f4, f5, omecc2, sqome2, sqome3
+
+    @staticmethod
+    def sciarini_spin_eq_ratio(ecc):
+        """Return the Sciarini et al. (2024) pseudo-synchronous spin ratio.
+
+        The ratio ``Omega_spin_eq / Omega_orb`` is approximated with two smooth fits
+        joined by a short linear bridge across the sharp transition near ``ecc ~ 0.567``.
+        This keeps the limiter fast while remaining close to the zero-torque solution
+        of Eq. (9).
+        """
+        ecc = max(0.0, min(ecc, 0.99))
+
+        if ecc <= 0.566:
+            return (
+                1.0
+                + 1.14245147 * ecc ** 0.75
+                - 1.62262989 * ecc ** 1.5
+                + 2.72343924 * ecc ** 3.0
+                - 1.75979733 * ecc ** 4.0
+            )
+
+        if ecc < 0.567:
+            return 1.406164 + (1.820860 - 1.406164) * (ecc - 0.566) / 0.001
+
+        y = 1.0 - ecc
+        return (
+            2.31131260
+            - 0.46017765 * y
+            - 1.33718314 * y ** 2
+            + 2.48817951 * y ** 3
+            - 6.71804943 * y ** 4
+        )
+
+    def apply_radiative_tide_sciarini(self, star1, star2, adjustment=False):
+        """Compute radiative dynamical-tide terms for one component.
+
+        The implementation follows the Zahn-consistent formulation of
+        Sciarini et al. (2024, A&A, 681, L1). The eccentricity evolution and
+        spin torque are evaluated from their Eq. (9), using the signed tidal
+        forcing frequencies
+
+        ``s_lm = (l * Omega_orb - m * Omega_spin) * sqrt(R^3 / (G * M))``.
+
+        ``E2`` is currently evaluated with the legacy Hurley-style mass fit
+        ``E2 = 1.592e-9 * M**2.84``. The dynamical time is converted to years
+        because POPKIN stores radii and masses in solar units and angular
+        frequencies in inverse years.
+
+        When ``adjustment`` is enabled, the spin derivative is limited so that
+        one timestep does not overshoot the approximate pseudo-synchronous spin
+        used by POPKIN. This limiter does not alter the instantaneous Sciarini
+        torque unless the proposed timestep would cross that target.
+
+        Parameters
+        ----------
+        star1 : SingleStar
+            Star undergoing radiative dynamical-tide damping.
+        star2 : SingleStar
+            Companion star; its mass sets the mass ratio.
+        adjustment : bool, optional
+            Whether to apply the post-timestep spin limiter.
+
+        Returns
+        -------
+        tuple
+            ``(edot_tide_i, jdot_tide_i, spin_dot_i)``:
+            the eccentricity derivative, spin angular-momentum derivative,
+            and spin-frequency derivative for ``star1``.
+        """
+
+        if star1.mass <= 0.0 or star1.R <= 0.0 or self.sep <= 0.0:
+            return 0.0, 0.0, 0.0
+
+        q = star2.mass / star1.mass
+
+        # sqrt(R^3 / GM) in years for R [Rsun], M [Msun]
+        dyn_time = 5.05e-5 * np.sqrt(star1.R ** 3 / star1.mass)
+
+        # Zahn (1977), Eq. (2.6): s_lm = (l Omega_orb - m Omega_spin) * (R^3 / GM)^1/2.
+        s10 = self.omega * dyn_time
+        s12 = (self.omega - 2.0 * star1.spin) * dyn_time
+        s22 = 2.0 * (self.omega - star1.spin) * dyn_time
+        s32 = (3.0 * self.omega - 2.0 * star1.spin) * dyn_time
+
+        def signed_pow_8_over_3(x):
+            return (abs(x) ** (8.0 / 3.0)) * np.sign(x)
+
+        e2_radiative = 1.592e-9 * (star1.mass ** 2.84)
+
+        # Sciarini et al. (2024), their Eq. (9): eccentricity evolution for
+        # radiative dynamical tides in the Zahn-consistent form.
+        prefactor_e = -0.75 * self.ecc / dyn_time
+        prefactor_e *= q * ((1.0 + q) ** 0.5) * e2_radiative
+        prefactor_e *= (star1.R / self.sep) ** (13.0 / 2.0)
+
+        edot_tide_i = prefactor_e * (
+            1.5 * signed_pow_8_over_3(s10)
+            - 0.25 * signed_pow_8_over_3(s12)
+            - signed_pow_8_over_3(s22)
+            + 12.25 * signed_pow_8_over_3(s32)
+        )
+
+        # Sciarini et al. (2024), their Eq. (9): spin torque for eccentric orbits.
+        # This reduces to Eq. (B.1) in the circular-orbit limit e -> 0.
+        prefactor_j = 1.5 * star1.mass * star1.R ** 2 * e2_radiative / (dyn_time ** 2)
+        prefactor_j *= q ** 2 * (star1.R / self.sep) ** 6
+        torque = prefactor_j * (
+            signed_pow_8_over_3(s22)
+            + self.ecc ** 2 * (
+                0.25 * signed_pow_8_over_3(s12)
+                - 5.0 * signed_pow_8_over_3(s22)
+                + 12.25 * signed_pow_8_over_3(s32)
+            )
+        )
+
+        jspin_inertia = (
+            star1.k2 * (star1.mass - star1.M_core) * star1.R ** 2
+            + star1.k3 * star1.M_core * star1.R_core ** 2
+        )
+
+        if jspin_inertia <= 0.0:
+            raise ValueError(
+                f'Invalid spin inertia: jspin_inertia = {jspin_inertia}. '
+                f'Please check the stellar mass and core mass for the calculation of radiative tide.'
+            )
+
+        spin_dot_i = torque / jspin_inertia
+
+        if adjustment and self.dt > 0.0:
+            spin_eq = self.omega * self.sciarini_spin_eq_ratio(self.ecc)
+            if spin_dot_i >= 0.0:
+                spin_dot_i = min(spin_dot_i, (spin_eq - star1.spin) / self.dt)
+            else:
+                spin_dot_i = max(spin_dot_i, (spin_eq - star1.spin) / self.dt)
+            torque = jspin_inertia * spin_dot_i
+
+        return edot_tide_i, torque, spin_dot_i
 
     # ------------------------------------------------------------------------------------------------------------------
     #                                                     Event mapping
@@ -1851,4 +2016,3 @@ class BinaryStar:
             df_dx = (2 + a) * x ** (1 + a) - b * (1 + a) * x ** a
             x = x - f / df_dx
         raise ValueError("Merging-mass solver did not converge within max_iterations.")
-

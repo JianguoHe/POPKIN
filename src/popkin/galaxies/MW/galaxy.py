@@ -36,8 +36,8 @@ class MilkyWay:
             self,
             metallicity_model: Literal['constant', 'enrichment'] = 'constant',
             Z: float = 0.02,
-            IMF_scheme: str = 'Kroupa2002',
-            binary_fraction: float | str = 'Haaften2013',
+            IMF_scheme: str = 'kroupa2002',
+            binary_fraction: float | str = 'haaften2013',
     ):
         """Initialize the Milky Way model.
 
@@ -46,8 +46,8 @@ class MilkyWay:
                 - 'constant': use a fixed metallicity.
                 - 'enrichment': use the predefined metallicity grid varying with time and radius.
             Z: Metallicity value used to select stellar birth regions.
-            IMF_scheme: IMF model name. Must be one of: 'Kroupa2002', 'Kroupa1993', or 'Weisz2015'
-            binary_fraction: Binary fraction. Can be a float in [0, 1] or 'Haaften2013'
+            IMF_scheme: IMF model name. Must be one of: 'kroupa2002', 'kroupa1993', or 'weisz2015'
+            binary_fraction: Binary fraction. Can be a float in [0, 1] or 'haaften2013'
 
         Raises:
             ValueError: If parameters are outside supported ranges.
@@ -577,4 +577,3 @@ class MilkyWay:
             print(json.dumps(info_dict, indent=4, ensure_ascii=False))
 
         return info_dict
-

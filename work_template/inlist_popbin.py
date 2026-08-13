@@ -21,8 +21,8 @@ m2_range = (0.1, 100.0)
 # Orbital-separation range [unit: R_sun].
 # sep_range = (3.0, 10000.0)
 
-# Initial orbit model. Options: 'Sana2012', 'Hurley2002'.
-# ini_orbit_scheme = 'Sana2012'
+# Initial orbit model. Options: 'hurley2002', 'sana2012'.
+# ini_orbit_scheme = 'sana2012'
 
 # Initial eccentricity distribution. Options: 'zero', 'uniform', 'thermal'.
 # ini_ecc_scheme = 'zero'
@@ -81,11 +81,4 @@ popbin_output_columns = {
 
 # Number of significant digits retained in output.
 # output_precision = 6
-
-
-
-
-
-
-
 
