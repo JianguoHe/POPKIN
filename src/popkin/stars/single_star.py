@@ -2200,7 +2200,7 @@ class SingleStar:
                 self.R = self.rg
             self.M_core = self.lum_to_mc_gb(self.L)
 
-            if initialize or old_type != self.type:
+            if initialize or old_type == 7:
                 return
             
             # Case 1: the helium-star envelope is fully stripped. Degenerate CO/ONe cores become WDs,
