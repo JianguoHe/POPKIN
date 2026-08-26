@@ -1113,7 +1113,7 @@ class SingleStar:
         elif self.first_mt_case == 3:
             mco1_zsun, mco2_zsun, mco3_zsun = 6.6, 7.1, 13.2
             mco1_zsub, mco2_zsub, mco3_zsub = 6.3, 7.1, 12.3
-            mco_ns1_zsun, mco_ns2_zsun = 9.6, 11.7
+            mco_ns1_zsun, mco_ns2_zsun = 9.6, 10.7
             mco_ns1_zsub, mco_ns2_zsub = 8.9, 9.5
         else:
             raise ValueError("Unsupported first_mt_case. Expected one of: 0, 1, 2, 3.")
