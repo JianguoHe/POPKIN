@@ -977,6 +977,7 @@ class SingleStar:
             raise ValueError("Please check the remnant type after the supernova explosion.")
 
     def SN_remnant_fryer2012_rapid(self):
+        # For 7 <= m_co < 11 Msun, the baryonic remnant mass is mrem_bar = 6.1 + (m - 6.1) * (m_co - 7) / 4.
         mproto = 1.0
         if self.M_core < 2.5:
             mfb = 0.2
