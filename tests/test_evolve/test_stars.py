@@ -33,6 +33,12 @@ MODEL_CONFIGS = {
     },
 }
 
+REMNANT_LABELS = {
+    "Fryer et al. (2012), rapid": "F12(R)",
+    "Mandel et al. (2020)": "MM20",
+    "Maltsev et al. (2025)": "M25(0.5)",
+}
+
 MASS_GRID = np.linspace(0.1, 100.0, 501)
 REMNANT_COLORS = ("#4D4D4D", "#7B61A8", "#D62728")
 
@@ -99,16 +105,16 @@ def _record_single_star_model(model_config, metallicity, wind_model):
 def _plot_pre_sn_masses(ax, data, colors):
     """Plot the progenitor mass and core masses shared by both SN models."""
     quantities = (
-        ("mass_pre_sn", r"$M_{\rm total}$"),
-        ("mass_he", r"$M_{\rm He}$"),
-        ("mass_co", r"$M_{\rm CO}$"),
+        ("mass_pre_sn", "total"),
+        ("mass_he", "helium core"),
+        ("mass_co", "carbon oxygen core"),
     )
     for color, (name, label) in zip(colors, quantities):
         ax.plot(
             data["mass0"],
             data[name],
             color=color,
-            linewidth=2.0,
+            linewidth=4.0,
             label=label,
         )
 
@@ -121,10 +127,10 @@ def _plot_remnant_masses(ax, model_data, colors):
             data["mass_remnant"],
             color=color,
             marker="o",
-            markersize=3.0,
+            markersize=1.5,
             markerfacecolor="none",
-            markeredgewidth=0.9,
-            alpha=0.85,
+            markeredgewidth=0.7,
+            alpha=1,
             linestyle="None",
             label=model_name,
         )
@@ -174,7 +180,7 @@ def test_stars():
 
     fig, axes = plt.subplots(2, 2, figsize=(11.0, 8.5), sharex=True, sharey=True)
     axes = axes.ravel()
-    progenitor_labels = (r"$M_{\rm total}$", r"$M_{\rm He}$", r"$M_{\rm CO}$")
+    progenitor_labels = ("total", "helium core", "carbon oxygen core")
 
     for panel_index, (ax, (metallicity, wind_model), model_data) in enumerate(
         zip(axes, panel_configs, panel_data)
@@ -191,17 +197,8 @@ def test_stars():
 
         ax.set_xlim(0.0, 100.0)
         ax.set_ylim(0.0, y_max)
-        if row == 0:
-            ax.set_xlabel("")
-            ax.tick_params(axis="x", labelbottom=True)
-        else:
-            ax.set_xlabel(r"$M_{\rm ZAMS}\,(M_\odot)$")
-
-        if column == 0:
-            ax.set_ylabel(r"$M_{\rm pre, SN}\,(M_\odot)$")
-        else:
-            ax.set_ylabel("")
-            ax.tick_params(axis="y", labelleft=True)
+        ax.set_xlabel(r"$M_{\rm ZAMS}\,(M_\odot)$")
+        ax.set_ylabel(r"$M_{\rm pre-SN}\,(M_\odot)$")
 
         ax.tick_params(
             axis="both",
@@ -212,6 +209,8 @@ def test_stars():
             left=True,
             right=True,
             labeltop=False,
+            labelbottom=True,
+            labelleft=True,
             labelright=False,
         )
 
@@ -226,13 +225,14 @@ def test_stars():
 
         remnant_handles = [
             Line2D(
-                [0], [0], color=color, marker="o", markersize=5,
-                markerfacecolor="none", linestyle="None", label=model_name,
+                [0], [0], color=color, marker="o", markersize=2.0,
+                markerfacecolor="none", linestyle="None",
+                label=REMNANT_LABELS[model_name],
             )
             for color, model_name in zip(REMNANT_COLORS, MODEL_CONFIGS)
         ]
         progenitor_handles = [
-            Line2D([0], [0], color=color, linewidth=2.0, label=label)
+            Line2D([0], [0], color=color, linewidth=3.0, label=label)
             for color, label in zip(colors[:3], progenitor_labels)
         ]
         ax.legend(
