@@ -36,7 +36,7 @@ MODEL_CONFIGS = {
 REMNANT_LABELS = {
     "Fryer et al. (2012), rapid": "F12(R)",
     "Mandel et al. (2020)": "MM20",
-    "Maltsev et al. (2025)": "M25(0.5)",
+    "Maltsev et al. (2025)": "M25(0.50)",
 }
 
 MASS_GRID = np.linspace(0.1, 100.0, 501)
