@@ -12,7 +12,7 @@ from popkin.physics import m_dot_bh_hot_accretion, m_dot_edd
 
 logger = get_logger(__name__)
 
-REQUIRED_COLUMNS = ("mass", "v_pec", "num", "dist", "rho", "z")
+REQUIRED_COLUMNS = ("mass", "v_pec", "kick", "num", "dist", "rho", "z")
 DEFAULT_PHASES = ("MCs", "coldHI", "warmHI", "warmHII", "hotHII")
 DEFAULT_DISCRETE_DENSITY_POINTS = {"MCs": 10, "coldHI": 10}
 DEFAULT_DISTANCE_CUTS_KPC = (0.5, 1.0, 10.0)
@@ -42,9 +42,10 @@ def summarize_isolated_bh_accretion(
     """Write compact ISM-accretion summaries for isolated black holes.
 
     Args:
-        data: A pandas DataFrame with columns ``mass``, ``v_pec``, ``num``,
-            ``dist``, ``rho``, and ``z``. Here ``rho`` is the cylindrical
-            Galactocentric radius, not gas density.
+        data: A pandas DataFrame with columns ``mass``, ``v_pec``, ``kick``,
+            ``num``, ``dist``, ``rho``, and ``z``. Here ``rho`` is the
+            cylindrical Galactocentric radius, not gas density. ``kick`` is
+            the natal-kick magnitude in km/s.
         output_path: Directory where the summary CSV files are written.
         galaxy: Optional galaxy model. If omitted, a default ``MilkyWay`` model
             is created inside the function.
@@ -77,6 +78,7 @@ def summarize_isolated_bh_accretion(
 
     mass = data["mass"].to_numpy(copy=False)
     v_pec = data["v_pec"].to_numpy(copy=False)
+    kick = data["kick"].to_numpy(copy=False)
     num = data["num"].to_numpy(copy=False)
     dist = data["dist"].to_numpy(copy=False)
     rho = data["rho"].to_numpy(copy=False)
@@ -117,6 +119,7 @@ def summarize_isolated_bh_accretion(
                     dist=dist,
                     mass=mass,
                     v_pec=v_pec,
+                    kick=kick,
                     source_index=_optional_column(data, "index"),
                     mdot_range=mdot_range,
                     flux_bol_range=flux_bol_range,
@@ -140,6 +143,7 @@ def summarize_isolated_bh_accretion(
                 dist=dist,
                 mass=mass,
                 v_pec=v_pec,
+                kick=kick,
                 source_index=_optional_column(data, "index"),
                 mdot_range=mdot_range,
                 flux_bol_range=flux_bol_range,
@@ -193,6 +197,7 @@ def _accumulate_phase_results(
     dist,
     mass,
     v_pec,
+    kick,
     source_index,
     mdot_range,
     flux_bol_range,
@@ -218,6 +223,7 @@ def _accumulate_phase_results(
     dist = dist_array[valid].astype(np.float64, copy=False)
     mass = np.asarray(mass)[valid].astype(np.float64, copy=False)
     v_pec = np.asarray(v_pec)[valid]
+    kick = np.asarray(kick)[valid].astype(np.float64, copy=False)
     source_index = np.asarray(source_index)[valid] if source_index is not None else None
 
     mdot_edd = m_dot_edd(m=mass)
@@ -250,6 +256,7 @@ def _accumulate_phase_results(
                 "n_H": n_h,
                 "mass": mass[candidate_mask],
                 "v_pec": v_pec[candidate_mask],
+                "kick": kick[candidate_mask],
                 "dist": dist[candidate_mask],
                 "num": weights[candidate_mask],
                 "mdot": mdot[candidate_mask],
