@@ -578,50 +578,24 @@ class BinaryStar:
             #     self.CE_evolution(i)
         else:
             # NS/BH binary: merge directly.
-            # 中子星/黑洞双星 → 直接合并
             if stars[i].type in {13, 14} and stars[1 - i].type in {13, 14}:
                 stable = False
+
             # WD + NS/BH system: form an UCXB or merge depending on the WD mass.
-            # 白矮星+中子星/黑洞 → UCXBs/合并
             elif stars[i].type in {10, 11, 12} and stars[1 - i].type in {13, 14}:
                 if stars[i].mass > max_wd_mass_stable_mt_to_ns_bh:
                     stable = False
                 else:
                     stable = True
+
             # Double-WD system: AM CVn channel or merger.
-            # 双白矮星 → AM CVn/合并
             elif stars[i].type in {10, 11, 12} and stars[1 - i].type in {10, 11, 12}:
                 if stars[i].mass / stars[1 - i].mass > 0.628:
                     stable = False
                 else:
                     stable = True
-            # Two hydrogen-rich stars.
-            # 两个富氢恒星
-            elif (stars[i].type in {0, 1, 2} or (stars[i].type == 4 and stars[i].mass0 >= 12)) and stars[
-                1 - i].type <= 2:
-                # ZAMS 充满洛希瓣
-                if self.step == 0:
-                    mass1i = self.star1.mass
-                    mass2i = self.star2.mass
-                    tbi = self.period * day_per_year
-                # ZAMS 未充满洛希瓣
-                else:
-                    mass1i = self.data[0]['m1']
-                    mass2i = self.data[0]['m2']
-                    tbi = self.data[0]['period']
-                # print(i, self.step, mass1i, mass2i, tbi)
-                if i == 0:
-                    qc = MT_stability_MS(stars[i].type, mass1i, mass2i, tbi, mass_accretion_model)
-                else:
-                    qc = MT_stability_MS(stars[i].type, mass2i, mass1i, tbi, mass_accretion_model)
-                # qc = MT_stability_MS(stars[i].type, stars[i].mass0, stars[1 - i].mass0, self.data[0]['period'],
-                #                      mass_accretion_model=mass_accretion_model)
-                if q[i] > qc:
-                    stable = False
-                else:
-                    stable = True
-            # Stability criterion for mass transfer from a hydrogen-rich donor to an NS/BH accretor.
-            # 中子星/黑洞 + 富氢恒星的物质转移稳定性判据
+
+            # Hydrogen-rich donor with an NS/BH accretor.
             elif stars[i].type <= 6 and stars[1 - i].type in {13, 14}:
                 # 【Shao, Y., & Li, X.-D. 2021, ApJ, 920, 81】
                 if q[i] < 2:
@@ -651,30 +625,8 @@ class BinaryStar:
                 #         self.CE_evolution(i)
                 #     else:
                 #         self.RLOF(i)
-            # Hertzsprung-gap donor.
-            # 赫氏空隙作为donor星
-            elif stars[i].type == 2:
-                qc = 4
-                if q[i] > qc:
-                    stable = False
-                else:
-                    stable = True
-            # Giant donor.
-            # 巨星作为donor星
-            elif stars[i].type in {3, 5, 6}:
-                # qc = (1.67d0-zpars(7)+2.d0*(massc(j1)/mass(j1))**5)/2.13d0
-                # Alternatively use condition of Hjellming & Webbink, 1987, ApJ, 318, 794.
-                qc = 0.362 + 1 / (3 * (1 - stars[i].M_core / stars[i].mass))
-                if q[i] > qc:
-                    stable = False
-                else:
-                    stable = True
-            # Hydrogen main-sequence/helium-star donor with a helium-star companion.
-            # 氢主序/氦星 + 氦星
-            elif stars[i].type in {0, 1, 7, 8, 9} and stars[1 - i].type in {7, 8, 9}:
-                stable = True
-            # Helium-star donor with a compact companion.
-            # 氦星 + 致密星
+            
+            # Helium-star donor with an NS/BH accretor.
             elif stars[i].type in {7, 8, 9} and stars[1 - i].type in {13, 14}:
                 # If the period is shorter than 0.06 d, CE evolution may occur (Tauris 2015, MNRAS, 451, 2123).
                 # 如果周期小于0.06天, 则可能会发生CE (Tauris, T. 2015, MNRAS, 451, 2123)
@@ -686,6 +638,48 @@ class BinaryStar:
                     stable = False
                 else:
                     stable = True
+
+            # Two hydrogen-rich stars.
+            elif (stars[i].type in {0, 1, 2} or (stars[i].type == 4 and stars[i].mass0 >= 12)) and stars[
+                1 - i].type <= 2:
+                # ZAMS overfilling Roche lobe
+                if self.step == 0:
+                    mass1i = self.star1.mass
+                    mass2i = self.star2.mass
+                    tbi = self.period * day_per_year
+                # ZAMS underfilling Roche lobe
+                else:
+                    mass1i = self.data[0]['m1']
+                    mass2i = self.data[0]['m2']
+                    tbi = self.data[0]['period']
+                if i == 0:
+                    qc = MT_stability_MS(stars[i].type, mass1i, mass2i, tbi, mass_accretion_model)
+                else:
+                    qc = MT_stability_MS(stars[i].type, mass2i, mass1i, tbi, mass_accretion_model)
+                if q[i] > qc:
+                    stable = False
+                else:
+                    stable = True
+
+            # Hertzsprung-gap donor.
+            elif stars[i].type == 2:
+                qc = 4
+                if q[i] > qc:
+                    stable = False
+                else:
+                    stable = True
+
+            # Giant donor.
+            elif stars[i].type in {3, 5, 6}:
+                # qc = (1.67d0-zpars(7)+2.d0*(massc(j1)/mass(j1))**5)/2.13d0
+                # Alternatively use condition of Hjellming & Webbink, 1987, ApJ, 318, 794.
+                qc = 0.362 + 1 / (3 * (1 - stars[i].M_core / stars[i].mass))
+                if q[i] > qc:
+                    stable = False
+                else:
+                    stable = True
+
+            # Other cases.
             else:
                 qc = 3.0
                 if q[i] > qc:
