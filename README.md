@@ -369,7 +369,30 @@ generate figures, write diagnostic files, or require optional dependencies.
 
 ## 📝 Citation
 
-If you use POPKIN in a publication, please cite the POPKIN paper when available.
+If you use POPKIN in a publication, please cite the following paper, which
+describes the framework and its first application:
+
+```bibtex
+@ARTICLE{He2026POPKIN,
+       author = {{He}, Jian-Guo and {Shao}, Yong and {Nie}, Yu-Dong and
+                 {Wang}, Gui-Yu and {Xu}, Xiao-Tian and {Wang}, Chen and
+                 {Xu}, Xiao-Jie and {Li}, Xiang-Dong},
+        title = "{A Census of Stellar-mass Black Holes in the Milky Way with POPKIN. I. Isolated Black Holes}",
+      journal = {arXiv e-prints},
+     keywords = {Astrophysics of Galaxies, High Energy Astrophysical Phenomena, Solar and Stellar Astrophysics},
+         year = 2026,
+        month = sep,
+          eid = {arXiv:2609.29211},
+        pages = {arXiv:2609.29211},
+ archivePrefix = {arXiv},
+       eprint = {2609.29211},
+ primaryClass = {astro-ph.GA},
+          url = {https://arxiv.org/abs/2609.29211},
+      adsurl = {https://ui.adsabs.harvard.edu/abs/2026arXiv260929211H},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+```
+
 For the underlying BSE framework, cite:
 
 ```bibtex
