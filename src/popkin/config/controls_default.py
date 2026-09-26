@@ -116,7 +116,7 @@ Z_list: list = [
 # Initial mass function:
 # - 'kroupa1993':
 # - 'kroupa2002':                 increased proportion of stars above 1 M_sun compared to kroupa1993
-# - 'weisz2015':                  IMF for M31 galaxy
+# - 'weisz2015':                  Weisz et al. (2015) three-segment IMF for the Andromeda Galaxy (M31)
 IMF_scheme: str = 'kroupa2002'
 
 # Binary fraction
@@ -255,6 +255,49 @@ sse_output_columns: list = [
     'mdot', 'mdot_wind', 'mdot_mt', 'jspin', 'jdot', 'jdot_wind', 'jdot_tide', 'jdot_mt', 'jdot_mb'
 ]
 
+# SSE output-column reference
+#
+# The following columns describe the processed output of the SSE program.
+# Numerical quantities are output as floats, while type and event are output as strings.
+#
+# Column            Type       Unit                         Physical meaning
+# time              float      Myr                          Evolutionary time
+# type              string     --                           Stellar type:
+#                                                               'MS', 'HG', 'GB', 'CHeB', 'EAGB', 'TPAGB'                                                             
+#                                                               'HeMS', 'HeHG', 'HeGB'
+#                                                               'HeWD', 'COWD', 'ONeWD', 'NS', 'BH'
+#                                                               'massless'                                                     
+# mass              float      M_sun                        Current stellar mass
+# M_core            float      M_sun                        Core mass
+# R                 float      R_sun                        Stellar radius used in the evolution
+# R_core            float      R_sun                        Core radius
+# L                 float      L_sun                        Stellar luminosity
+# L_core            float      L_sun                        Core luminosity
+# M_conv_env        float      M_sun                        Convective-envelope mass
+# R_conv_env        float      R_sun                        Convective-envelope radius
+# spin              float      yr^-1                        Stellar angular velocity
+# Teff              float      K                            Effective temperature
+# event             string     --                           Evolutionary event label:
+#                                                               'AIC', 'ECSN', 'CCSN', 'Ia' or empty if no event
+# v_kick_x          float      km s^-1                      Natal-kick velocity component along the x-axis
+# v_kick_y          float      km s^-1                      Natal-kick velocity component along the y-axis
+# v_kick_z          float      km s^-1                      Natal-kick velocity component along the z-axis
+# mdot              float      M_sun yr^-1                  Total stellar mass-change rate
+# mdot_wind         float      M_sun yr^-1                  Mass-change rate due to stellar winds
+# mdot_mt           float      M_sun yr^-1                  Mass-change rate due to mass transfer
+# jspin             float      M_sun R_sun^2 yr^-1          Stellar spin angular momentum
+# jdot              float      M_sun R_sun^2 yr^-2          Total spin-angular-momentum change rate
+# jdot_wind         float      M_sun R_sun^2 yr^-2          Contribution from stellar winds
+# jdot_tide         float      M_sun R_sun^2 yr^-2          Contribution from tidal interactions
+# jdot_mt           float      M_sun R_sun^2 yr^-2          Contribution from mass transfer
+# jdot_mb           float      M_sun R_sun^2 yr^-2          Contribution from magnetic braking
+#
+# Note:
+#   Stellar types are internally represented by numerical type codes, but are
+#   converted to the strings listed above in the processed SSE output.
+#   The kick velocity of single star could in the arbitrary reference frame.
+
+
 # BSE program output columns
 bse_output_columns: list = [
     'time', 'ecc', 'period', 'sep', 'type1', 'type2', 'm1', 'm2', 'mc1', 'mc2',
@@ -264,6 +307,63 @@ bse_output_columns: list = [
     'jorb', 'jdot', 'jdot_wind', 'jdot_tide', 'jdot_mt', 'jdot_gr', 'edot', 'edot_wind', 'edot_tide', 'edot_gr',
 ]
 
+# BSE output-column reference
+#
+# The following columns describe the processed output of the BSE program.
+# Numerical quantities are output as floats, type1/type2, event, and state are
+# output as strings, and bound is output as a boolean.
+#
+# Column            Type       Unit                         Physical meaning
+# time              float      Myr                          Evolutionary time
+# ecc               float      --                           Orbital eccentricity
+# period            float      day                          Orbital period
+# sep               float      R_sun                        Orbital semi-major axis
+# type1             string     --                           Current type of star 1 (the primary); see the SSE reference for labels
+# type2             string     --                           Current type of star 2 (the secondary); see the SSE reference for labels
+# m1                float      M_sun                        Current mass of star 1
+# m2                float      M_sun                        Current mass of star 2
+# mc1               float      M_sun                        Core mass of star 1
+# mc2               float      M_sun                        Core mass of star 2
+# R1_div_RL1        float      --                           Radius of star 1 divided by its Roche-lobe radius
+# R2_div_RL2        float      --                           Radius of star 2 divided by its Roche-lobe radius
+# event             string     --                           Binary-evolution event label:
+#                                                               'CE', 'RLOF begin', 'RLOF end', 'merge', 'disrupt', or empty if no event
+# bound             bool       --                           True for a bound orbit (0 <= ecc < 1)
+# state             string     --                           Current binary state: 'detached', 'semidetached', 'contact', or 'disrupted'
+# v_offset_x        float      km s^-1                      x component of the post-SN center-of-mass velocity of a bound binary
+# v_offset_y        float      km s^-1                      y component of the post-SN center-of-mass velocity of a bound binary
+# v_offset_z        float      km s^-1                      z component of the post-SN center-of-mass velocity of a bound binary
+# v1_offset_x       float      km s^-1                      x component of the post-disruption runaway velocity of star 1
+# v1_offset_y       float      km s^-1                      y component of the post-disruption runaway velocity of star 1
+# v1_offset_z       float      km s^-1                      z component of the post-disruption runaway velocity of star 1
+# v2_offset_x       float      km s^-1                      x component of the post-disruption runaway velocity of star 2
+# v2_offset_y       float      km s^-1                      y component of the post-disruption runaway velocity of star 2
+# v2_offset_z       float      km s^-1                      z component of the post-disruption runaway velocity of star 2
+# v1_kick_x         float      km s^-1                      x component of the natal kick received by star 1
+# v1_kick_y         float      km s^-1                      y component of the natal kick received by star 1
+# v1_kick_z         float      km s^-1                      z component of the natal kick received by star 1
+# v2_kick_x         float      km s^-1                      x component of the natal kick received by star 2
+# v2_kick_y         float      km s^-1                      y component of the natal kick received by star 2
+# v2_kick_z         float      km s^-1                      z component of the natal kick received by star 2
+# jorb              float      M_sun R_sun^2 yr^-1          Orbital angular momentum
+# jdot              float      M_sun R_sun^2 yr^-2          Total orbital-angular-momentum change rate
+# jdot_wind         float      M_sun R_sun^2 yr^-2          Contribution from stellar winds
+# jdot_tide         float      M_sun R_sun^2 yr^-2          Contribution from tidal interactions
+# jdot_mt           float      M_sun R_sun^2 yr^-2          Contribution from non-conservative mass transfer
+# jdot_gr           float      M_sun R_sun^2 yr^-2          Contribution from gravitational-wave radiation
+# edot              float      yr^-1                        Total eccentricity change rate
+# edot_wind         float      yr^-1                        Contribution from stellar winds
+# edot_tide         float      yr^-1                        Contribution from tidal interactions
+# edot_gr           float      yr^-1                        Contribution from gravitational-wave radiation
+#
+# Notes:
+#   Orbital quantities are meaningful only while the binary is bound. For a
+#   disrupted system, R1_div_RL1 and R2_div_RL2 are set to -1.
+#   Velocity offsets are measured in the pre-supernova center-of-mass frame;
+#   they are NaN when not applicable. At the supernova, +x points from the
+#   companion to the exploding star and +z follows the orbital angular momentum.
+
+
 # POPSIN program output columns
 popsin_output_columns: list = [
     'index', 'time', 'type', 'mass', 'M_core', 'R', 'L',
@@ -272,6 +372,37 @@ popsin_output_columns: list = [
     'R_core', 'L_core', 'M_conv_env', 'R_conv_env', 'spin', 'Teff',
     'mdot', 'mdot_wind', 'mdot_mt', 'jspin', 'jdot', 'jdot_wind', 'jdot_tide', 'jdot_mt', 'jdot_mb'
 ]
+
+# POPSIN output-column reference
+#
+# POPSIN output includes the SSE evolution columns plus population-synthesis
+# metadata. For time, type, mass, M_core, R, L, event, v_kick_*, R_core,
+# L_core, M_conv_env, R_conv_env, spin, Teff, mdot*, jspin, and jdot*, see the
+# SSE output-column reference above.
+#
+# Column            Type       Unit                         Physical meaning
+# index             int        --                           Index of the initial-mass grid point; also used as the random seed
+# weight            float      --                           Dimensionless population weight of the initial-mass grid point
+# rate              float      yr^-1                        Birth rate represented by this grid point at the stellar formation time
+# dt                float      Myr                          Duration represented by this evolutionary-output row; zero for the final row
+# num               float      --                           Expected number of systems represented by this row
+# Z                 float      --                           Initial metallicity used for the stellar-evolution track
+# origin            string     --                           Galactic birth component: 'thin_disk', 'thick_disk', or 'bulge'
+# ini_x             float      kpc                          Initial Galactocentric Cartesian x coordinate
+# ini_y             float      kpc                          Initial Galactocentric Cartesian y coordinate
+# ini_z             float      kpc                          Initial Galactocentric Cartesian z coordinate
+# ini_rho           float      kpc                          Initial Galactocentric cylindrical radius
+# ini_phi           float      rad                          Initial Galactocentric azimuth
+# ini_dist          float      kpc                          Initial distance from the Sun
+#
+# Notes:
+#   rate includes the grid-point weight and is calculated from the Galactic
+#   star-formation history. num is evaluated as rate * dt * 1e6 because dt is
+#   stored in Myr while rate is in yr^-1.
+#   Initial positions use galpy's left-handed Galactocentric coordinate system;
+#   the rotation direction aligns with Galactic rotation, and the Sun is at
+#   (8.0, 0.0, 0.0208) kpc in this frame.
+
 
 # POPBIN program output columns
 # - binary:             binary-related parameters
@@ -298,6 +429,44 @@ popbin_output_columns: dict[str, list[str]] = {
         'mdot', 'mdot_wind', 'mdot_mt', 'jspin', 'jdot', 'jdot_wind', 'jdot_tide', 'jdot_mt', 'jdot_mb',
     ],
 }
+
+# POPBIN output-column reference
+#
+# POPBIN output combines binary-evolution quantities, population-synthesis
+# metadata, and selected properties of each component. The unprefixed
+# binary-evolution columns (time through edot_gr) follow the BSE output-column
+# reference above. The population-synthesis columns (index, weight, rate, dt,
+# num, Z, origin, and ini_*) follow the POPSIN output-column reference above.
+#
+# Column/group                  Type       Unit                         Physical meaning
+# star1_<SSE column>            varies     see SSE reference            Selected current properties of star 1 (the primary)
+# star2_<SSE column>            varies     see SSE reference            Selected current properties of star 2 (the secondary)
+#
+# The component columns are named by prefixing an SSE output-column name with
+# star1_ or star2_. For example, star1_R and star2_R are the component radii;
+# star1_event and star2_event are their individual stellar-evolution events;
+# and star1_v_kick_x and star2_v_kick_x are their natal-kick components.
+# Their types, units, and physical definitions are otherwise identical to the
+# corresponding SSE columns.
+#
+# Optional columns:
+#   When enable_orbital_integration is True, POPBIN adds every requested
+#   info_orbit quantity for the binary and for each component. The binary uses
+#   the unprefixed name (for example, x or v_pec), while component quantities
+#   use star1_ and star2_ prefixes (for example, star1_x and star2_v_pec).
+#   See the Orbit output object attributes reference above for their meanings.
+#
+#   When calculate_gw_snr is True, POPBIN adds:
+#   gw_snr          float      --                           LISA SNR using the initial distance (ini_dist)
+#   gw_snr_orbit    float      --                           LISA SNR using the orbit-integrated distance (dist); present only when orbital integration is enabled
+#
+# Notes:
+#   The binary columns type1/type2, m1/m2, and mc1/mc2 are the types, masses,
+#   and core masses of stars 1 and 2, respectively. They are not duplicated as
+#   prefixed SSE columns. As in POPSIN, num is evaluated as rate * dt * 1e6.
+#   With simplify_output enabled, the catalogue retains the initial row, rows
+#   where either component changes type, and rows containing a binary event.
+
 
 # Simplify output (only for population synthesis)
 # - popsin: keep only type changes and target sources
