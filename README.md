@@ -125,11 +125,25 @@ survey models are planned extension points.
 
 We recommend installing POPKIN in a dedicated Conda environment.
 
-Run the following commands in the directory where you want to place the POPKIN
+Run the clone command in the directory where you want to place the POPKIN
 source tree:
 
 ```bash
+# Choose ONE of the following commands.
+
+# Stable release (recommended for reproducible calculations)
+git clone --branch v1.0.0 https://github.com/JianguoHe/POPKIN.git POPKIN
+
+# Development version (latest changes on main)
 git clone https://github.com/JianguoHe/POPKIN.git POPKIN
+```
+
+Check the [latest stable release](https://github.com/JianguoHe/POPKIN/releases/latest)
+for the current version tag and replace `v1.0.0` above if needed.
+
+After cloning either version, create and activate the Conda environment:
+
+```bash
 cd POPKIN
 conda env create -f environment.yml
 conda activate popkin
