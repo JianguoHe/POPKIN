@@ -2,7 +2,8 @@
 
 [![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://img.shields.io/badge/DOI-10.xxxx/xxxxx-blue)](https://doi.org/10.xxxx/xxxxx)
+[![arXiv](https://img.shields.io/badge/arXiv-2609.29211-b31b1b)](https://arxiv.org/abs/2609.29211)
+<!-- [![DOI](https://img.shields.io/badge/DOI-10.xxxx/xxxxx-blue)](https://doi.org/10.xxxx/xxxxx) -->
 
 POPKIN is a modular Python framework for rapid single-star evolution, 
 binary-star evolution, population synthesis, and stellar kinematics. 
@@ -19,9 +20,8 @@ interstellar-medium properties, and observable post-processing such as
 compact-binary gravitational-wave signal-to-noise ratios, isolated black-hole
 accretion, and microlensing observables.
 
-> Development status: POPKIN is under active development. Interfaces, default
-> prescriptions, and example workspaces may change before a stable public
-> release.
+> Version 1.0.0: POPKIN's first stable release. Development continues on `main`.
+> For reproducibility, use a tagged release and record the version in your work.
 
 ## 💡 Why POPKIN
 Modern compact-object surveys increasingly require models that do more than
@@ -431,4 +431,4 @@ Repository: https://github.com/JianguoHe/POPKIN
 
 Issue tracker: https://github.com/JianguoHe/POPKIN/issues
 
-The DOI link will be updated before the public release.
+The paper citation will be updated with the journal reference and DOI when available.
